@@ -775,12 +775,10 @@ function deleteSession(sessionId, adminId) {
       }
     }
 
-    if (foundRow === -1) {
-      return { success: false, error: 'ไม่พบองค์ประชุมนี้ในระบบ' };
+    // 2. ลบแถวในชีต Sessions (ถ้ามี — อาจถูกลบด้วยมือไปแล้วก็ไม่เป็นไร)
+    if (foundRow !== -1) {
+      sessSheet.deleteRow(foundRow);
     }
-
-    // 2. ลบแถวในชีต Sessions
-    sessSheet.deleteRow(foundRow);
 
     // 3. ลบประวัติการเช็คชื่อในชีต Attendance ที่ตรงกับ sessionId นี้ (ลบจากล่างขึ้นบน)
     const attSheet = setSheet(SHEETS.ATTENDANCE);
@@ -793,7 +791,7 @@ function deleteSession(sessionId, adminId) {
 
     // 4. ลบแท็บเฉพาะของวาระนี้ (วาระ_...) ถ้ามีอยู่
     const cleanTitle = (sessionTitle || sessionId)
-      .replace(/[\[\]\*\?:\/\\\'\"]/g, '')
+      .replace(/[\[\]\*\?:\/\\\'\"]/, '')
       .trim()
       .substring(0, 25);
     const sessionSheetName = 'วาระ_' + (cleanTitle || sessionId);
@@ -803,6 +801,20 @@ function deleteSession(sessionId, adminId) {
         ss.deleteSheet(targetSheet);
       } catch (delErr) {
         Logger.log('Could not delete sheet ' + sessionSheetName + ': ' + delErr.toString());
+      }
+    }
+
+    // ลองลบด้วยชื่อที่ตัด regex ออกหมด (กรณีชื่อมีอักขระพิเศษ)
+    if (!targetSheet && sessionTitle) {
+      const altCleanTitle = sessionTitle.replace(/[^ก-๙a-zA-Z0-9\s_\-]/g, '').trim().substring(0, 25);
+      const altSheetName = 'วาระ_' + altCleanTitle;
+      const altSheet = ss.getSheetByName(altSheetName);
+      if (altSheet) {
+        try {
+          ss.deleteSheet(altSheet);
+        } catch (delErr2) {
+          Logger.log('Could not delete alt sheet ' + altSheetName + ': ' + delErr2.toString());
+        }
       }
     }
 
@@ -818,10 +830,11 @@ function deleteSession(sessionId, adminId) {
       setupSessionReportTemplate();
     }
 
-    Logger.log('✅ ลบวาระองค์ประชุมสำเร็จ: ' + sessionTitle + ' (ID: ' + sessionId + ')');
+    const displayTitle = sessionTitle || sessionId;
+    Logger.log('✅ ลบวาระองค์ประชุมสำเร็จ: ' + displayTitle + ' (ID: ' + sessionId + ')');
     return {
       success: true,
-      message: 'ลบวาระองค์ประชุม "' + sessionTitle + '" และลบข้อมูลที่เกี่ยวข้องทั้งหมดใน Google Sheets เรียบร้อยแล้ว'
+      message: 'ลบวาระองค์ประชุม "' + displayTitle + '" และลบข้อมูลที่เกี่ยวข้องทั้งหมดใน Google Sheets เรียบร้อยแล้ว'
     };
   } catch (err) {
     return { success: false, error: err.toString() };

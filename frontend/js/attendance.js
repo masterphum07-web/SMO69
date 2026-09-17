@@ -399,8 +399,16 @@ const Attendance = {
         adminId: adminId
       });
 
-      if (res && res.success) {
-        alert(`✅ ลบวาระองค์ประชุม "${title}" และลบแท็บใน Google Sheets สำเร็จเรียบร้อยแล้ว!`);
+      // ไม่ว่า API จะ success หรือ error (เช่น ลบในชีตไปแล้ว) ให้ลบออกจาก UI เสมอ
+      const isApiSuccess = (res && res.success);
+      const isOrphanedSession = (!isApiSuccess && res && res.error && res.error.includes('ไม่พบ'));
+
+      if (isApiSuccess || isOrphanedSession) {
+        if (isApiSuccess) {
+          alert(`✅ ลบวาระองค์ประชุม "${title}" และลบแท็บใน Google Sheets สำเร็จเรียบร้อยแล้ว!`);
+        } else {
+          alert(`✅ วาระ "${title}" ถูกลบออกจากชีตไปแล้ว ระบบได้นำออกจากหน้าเว็บให้เรียบร้อยแล้วครับ`);
+        }
         
         // ล้าง session ปัจจุบัน
         const deletedId = this.currentSessionId;
@@ -412,6 +420,9 @@ const Attendance = {
         if (Array.isArray(this.sessions)) {
           this.sessions = this.sessions.filter(s => s.session_id !== deletedId);
         }
+
+        // ล้าง cache เพื่อดึงข้อมูลจริงจากชีตใหม่ในรอบถัดไป
+        Api.clearCache();
 
         // โหลดรายการและเรนเดอร์ใหม่
         this.populateSessions(this.sessions);
