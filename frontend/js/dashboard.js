@@ -136,7 +136,13 @@ const Dashboard = {
     tbody.innerHTML = '';
     students.forEach((st, idx) => {
       const currentStatus = map[st.full_name] || map[st.student_id] || '';
-      const branch = this.branches.find(b => b.branch_id === st.branch_id) || { branch_name: st.branch_id, color_hex: '#6B7280' };
+      const branch = this.branches.find(b => {
+        if (b.branch_id === st.branch_id) return true;
+        if ((st.branch_id === 'EMT' && b.branch_id === 'PMD') || (st.branch_id === 'PMD' && b.branch_id === 'EMT')) return true;
+        if ((st.branch_id === 'MR_BSC' && b.branch_id === 'BSC') || (st.branch_id === 'BSC' && b.branch_id === 'MR_BSC')) return true;
+        if ((st.branch_id === 'MR_DIP' && b.branch_id === 'DIP') || (st.branch_id === 'DIP' && b.branch_id === 'MR_DIP')) return true;
+        return false;
+      }) || { branch_name: st.branch_id, color_hex: '#6B7280' };
 
       const tr = document.createElement('tr');
       tr.innerHTML = `
@@ -241,7 +247,13 @@ const Dashboard = {
 
     tbody.innerHTML = '';
     students.forEach((st, idx) => {
-      const branch = this.branches.find(b => b.branch_id === st.branch_id) || { branch_name: st.branch_id, color_hex: '#6B7280' };
+      const branch = this.branches.find(b => {
+        if (b.branch_id === st.branch_id) return true;
+        if ((st.branch_id === 'EMT' && b.branch_id === 'PMD') || (st.branch_id === 'PMD' && b.branch_id === 'EMT')) return true;
+        if ((st.branch_id === 'MR_BSC' && b.branch_id === 'BSC') || (st.branch_id === 'BSC' && b.branch_id === 'MR_BSC')) return true;
+        if ((st.branch_id === 'MR_DIP' && b.branch_id === 'DIP') || (st.branch_id === 'DIP' && b.branch_id === 'MR_DIP')) return true;
+        return false;
+      }) || { branch_name: st.branch_id, color_hex: '#6B7280' };
 
       const tr = document.createElement('tr');
       tr.innerHTML = `

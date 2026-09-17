@@ -253,7 +253,18 @@ const Attendance = {
 
   getFilteredStudents() {
     return this.students.filter(st => {
-      const matchBranch = (this.branchFilter === 'ALL' || st.branch_id === this.branchFilter);
+      let matchBranch = (this.branchFilter === 'ALL');
+      if (!matchBranch) {
+        if (this.branchFilter === 'PMD' || this.branchFilter === 'EMT') {
+          matchBranch = (st.branch_id === 'PMD' || st.branch_id === 'EMT');
+        } else if (this.branchFilter === 'BSC' || this.branchFilter === 'MR_BSC') {
+          matchBranch = (st.branch_id === 'BSC' || st.branch_id === 'MR_BSC');
+        } else if (this.branchFilter === 'DIP' || this.branchFilter === 'MR_DIP') {
+          matchBranch = (st.branch_id === 'DIP' || st.branch_id === 'MR_DIP');
+        } else {
+          matchBranch = (st.branch_id === this.branchFilter);
+        }
+      }
       const query = this.searchQuery.trim().toLowerCase();
       const matchSearch = !query ||
         st.full_name.toLowerCase().includes(query) ||
@@ -277,7 +288,13 @@ const Attendance = {
 
     filtered.forEach((st, idx) => {
       const currentStatus = this.records[st.full_name] || '';
-      const branch = this.branches.find(b => b.branch_id === st.branch_id) || { branch_name: st.branch_id, color_hex: '#6B7280' };
+      const branch = this.branches.find(b => {
+        if (b.branch_id === st.branch_id) return true;
+        if ((st.branch_id === 'EMT' && b.branch_id === 'PMD') || (st.branch_id === 'PMD' && b.branch_id === 'EMT')) return true;
+        if ((st.branch_id === 'MR_BSC' && b.branch_id === 'BSC') || (st.branch_id === 'BSC' && b.branch_id === 'MR_BSC')) return true;
+        if ((st.branch_id === 'MR_DIP' && b.branch_id === 'DIP') || (st.branch_id === 'DIP' && b.branch_id === 'MR_DIP')) return true;
+        return false;
+      }) || { branch_name: st.branch_id, color_hex: '#6B7280' };
 
       const tr = document.createElement('tr');
       tr.id = `row-student-${idx}`;
