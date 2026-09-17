@@ -227,8 +227,8 @@
             <button class="btn-outline btn-sm" onclick="Attendance.markAllAs('มา')">
               ✓ เช็ค "มา" ทุกคนที่แสดง
             </button>
-            <button class="btn-outline btn-sm text-danger" onclick="Attendance.clearCurrentFilters()">
-              ล้างสถานะ
+            <button type="button" class="btn-outline btn-sm text-danger" onclick="Attendance.resetAllAttendance()" title="รีเซ็ตสถานะทุกคนขององค์ประชุมนี้กลับเป็น ยังไม่เช็ค">
+              🔄 ล้างผลเช็คชื่อ (Reset)
             </button>
           </div>
         </div>

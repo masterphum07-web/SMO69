@@ -57,14 +57,15 @@ function createReportSheetNow() {
     formatHeaderRow(attSheet, '#0F2F57');
   }
 
-  // 5. สร้างหรืออัปเดตแท็บรายงานผล
+  // 5. สร้างหรืออัปเดตแท็บแยกให้ครบทุกวาระองค์ประชุม และอัปเดตแท็บสรุปล่าสุด
   if (sessSheet.getLastRow() > 1) {
+    generateAllSessionsReports();
     generateLatestSessionReport();
   } else {
     setupSessionReportTemplate();
   }
 
-  // สลับหน้าจอมาที่แท็บรายงานผลทันที
+  // สลับหน้าจอมาที่แท็บรายงานผลล่าสุด
   const reportSheet = ss.getSheetByName(SHEETS.SESSION_REPORT);
   if (reportSheet) {
     try {
@@ -73,12 +74,12 @@ function createReportSheetNow() {
   }
 
   try {
-    ss.toast('✅ สร้างแท็บ "บันทึกผลการเช็คชื่อ" พร้อมรายชื่อ 53 คนและสีไฮไลต์เรียบร้อยแล้ว!', 'SMO 69 ระบบเช็คชื่อ', 8);
+    ss.toast('✅ สร้างแท็บแยกให้ครบทุกวาระองค์ประชุม และอัปเดตแท็บรายงานผลเรียบร้อยแล้ว!', 'SMO 69 ระบบเช็คชื่อ', 8);
   } catch (e) {}
 
   Logger.log('===========================================================');
-  Logger.log('✅ สร้างแท็บ "บันทึกผลการเช็คชื่อ" สำเร็จเรียบร้อยแล้ว!');
-  Logger.log('👉 กลับไปดูที่หน้า Google Sheets จะเห็นแท็บใหม่ทันที');
+  Logger.log('✅ สร้างแท็บแยกให้ครบทุกวาระองค์ประชุม และอัปเดตแท็บรายงานผลสำเร็จ!');
+  Logger.log('👉 กลับไปดูที่หน้า Google Sheets จะเห็นแท็บแยกของแต่ละวาระทันที');
   Logger.log('===========================================================');
 
   return 'SUCCESS';
@@ -358,6 +359,10 @@ function doGet(e) {
         result = generateSessionReport(e.parameter.sessionId);
         break;
 
+      case 'generateAllReports':
+        result = generateAllSessionsReports();
+        break;
+
       case 'createSession':
         result = createSession(e.parameter.title, e.parameter.date, e.parameter.branchScope, e.parameter.adminId);
         break;
@@ -602,6 +607,13 @@ function createSession(title, date, branchScope, adminId) {
 
   sheet.appendRow([sessionId, title, date, scope, 'draft', creator, nowStr]);
 
+  // สร้างแท็บเฉพาะสำหรับวาระนี้ใน Google Sheet ทันที พร้อมรายชื่อ 53 คน
+  try {
+    generateSessionReport(sessionId);
+  } catch (repErr) {
+    Logger.log('Warning generating session report in createSession: ' + repErr.toString());
+  }
+
   return {
     success: true,
     message: 'สร้างองค์ประชุมสำเร็จ',
@@ -644,14 +656,16 @@ function saveAttendanceDraft(sessionId, records, adminId) {
 
     records.forEach(rec => {
       const fullName = String(rec.full_name).trim();
-      const status = String(rec.status).trim();
-      if (!fullName || !status) return;
+      const status = String(rec.status).trim() || 'ยังไม่เช็ค';
+      if (!fullName) return;
+
+      const recordTime = (status === 'ยังไม่เช็ค') ? '-' : nowStr;
 
       if (existingRowMap[fullName]) {
         const rowNum = existingRowMap[fullName];
-        sheet.getRange(rowNum, 3, 1, 3).setValues([[status, checker, nowStr]]);
+        sheet.getRange(rowNum, 3, 1, 3).setValues([[status, checker, recordTime]]);
       } else {
-        rowsToAppend.push([sessionId, fullName, status, checker, nowStr]);
+        rowsToAppend.push([sessionId, fullName, status, checker, recordTime]);
       }
     });
 
@@ -1050,24 +1064,51 @@ function generateSessionReport(sessionId) {
     rate: rate
   };
 
-  // 1. วาดลงแท็บหลัก: 'บันทึกผลการเช็คชื่อ'
+  // 1. สร้าง/อัปเดตแท็บเฉพาะของวาระนี้เสมอ (แยกแท็บทุกวาระองค์ประชุม ไม่ว่าจะ draft หรือ submitted ไม่ทับกันแน่นอน)
+  const cleanTitle = (session.title || session.sessionId)
+    .replace(/[\[\]\*\?:\/\\\'\"]/g, '')
+    .trim()
+    .substring(0, 25);
+  const sessionSheetName = 'วาระ_' + (cleanTitle || session.sessionId);
+  const sessionSheet = setSheet(sessionSheetName);
+  renderReportToSheet(sessionSheet, session, students, attMap, stats);
+
+  // 2. ซิงค์ลงแท็บสรุปรวมล่าสุด 'บันทึกผลการเช็คชื่อ'
   const reportSheet = setSheet(SHEETS.SESSION_REPORT);
   renderReportToSheet(reportSheet, session, students, attMap, stats);
 
-  // 2. ถ้าเป็นองค์ประชุมที่ยืนยันส่งสรุปแล้ว ให้สำเนา/สร้างแท็บเฉพาะของวาระนี้เก็บไว้ด้วย
-  if (session.status === 'submitted') {
-    const cleanTitle = (session.title || session.sessionId)
-      .replace(/[:\\\/\?\*\[\]]/g, '')
-      .trim()
-      .substring(0, 25);
-    const archiveSheetName = 'รายงาน_' + cleanTitle;
-    const archiveSheet = setSheet(archiveSheetName);
-    renderReportToSheet(archiveSheet, session, students, attMap, stats);
+  SpreadsheetApp.flush();
+  Logger.log('✅ สร้างแท็บบันทึกรายงานผลการเช็คชื่อเรียบร้อย: ' + sessionSheetName);
+  return { success: true, sheetName: sessionSheetName, message: 'สร้างแท็บ ' + sessionSheetName + ' เรียบร้อย' };
+}
+
+/**
+ * ฟังก์ชันสร้าง/อัปเดตแท็บแยกให้ครบทุกวาระองค์ประชุมที่มีในระบบ
+ */
+function generateAllSessionsReports() {
+  const sessSheet = setSheet(SHEETS.SESSIONS);
+  const data = sessSheet.getDataRange().getValues();
+  if (data.length <= 1) {
+    setupSessionReportTemplate();
+    return { success: false, error: 'ยังไม่มีองค์ประชุมในระบบ' };
+  }
+
+  let count = 0;
+  for (let i = 1; i < data.length; i++) {
+    const sId = String(data[i][0]).trim();
+    if (sId) {
+      try {
+        generateSessionReport(sId);
+        count++;
+      } catch (err) {
+        Logger.log('Error in generateAllSessionsReports for ' + sId + ': ' + err.toString());
+      }
+    }
   }
 
   SpreadsheetApp.flush();
-  Logger.log('✅ สร้างแท็บบันทึกรายงานผลการเช็คชื่อเรียบร้อย: ' + session.title);
-  return { success: true, message: 'สร้างแท็บบันทึกรายงานผลสำเร็จ' };
+  Logger.log('✅ สร้างแท็บแยกให้ครบทุกวาระองค์ประชุมแล้ว รวม ' + count + ' วาระ');
+  return { success: true, count: count, message: 'สร้างแท็บแยกครบทุกวาระแล้ว (' + count + ' วาระ)' };
 }
 
 /**
@@ -1304,7 +1345,8 @@ function onOpen() {
   try {
     const ui = SpreadsheetApp.getUi();
     ui.createMenu('📋 ระบบเช็คชื่อ SMO 69')
-      .addItem('📊 สร้าง/อัปเดตแท็บรายงานผล (กดสร้างทันที)', 'createReportSheetNow')
+      .addItem('📑 สร้างแท็บแยกให้ครบทุกวาระองค์ประชุม', 'generateAllSessionsReports')
+      .addItem('📊 ซิงค์/อัปเดตแท็บสรุปล่าสุด (บันทึกผลการเช็คชื่อ)', 'createReportSheetNow')
       .addSeparator()
       .addItem('⚡ อัปเดตชีต Branches (6 สาขา)', 'updateBranchesOnly')
       .addItem('👥 อัปเดตชีต Students (53 คน)', 'updateStudentsOnly')

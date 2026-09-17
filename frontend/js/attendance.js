@@ -142,8 +142,9 @@ const Attendance = {
     if (res && res.success && Array.isArray(res.data)) {
       res.data.forEach(item => {
         const key = item.full_name || item.student_id;
-        if (key) {
-          this.records[key] = item.status;
+        const st = item.status ? String(item.status).trim() : '';
+        if (key && st && st !== 'ยังไม่เช็ค') {
+          this.records[key] = st;
         }
       });
     }
@@ -163,7 +164,13 @@ const Attendance = {
       if (!confirmEdit) return;
     }
 
-    this.records[fullName] = status;
+    // หากกดปุ่มสถานะเดิมซ้ำ ให้ยกเลิกกลับเป็น 'ยังไม่เช็ค'
+    if (this.records[fullName] === status) {
+      delete this.records[fullName];
+      status = '';
+    } else {
+      this.records[fullName] = status;
+    }
 
     if (idx !== undefined && idx !== null) {
       this.updateRowUI(idx, status);
@@ -205,10 +212,15 @@ const Attendance = {
     const user = Auth.getUser();
     const adminId = user ? user.adminId : 'admin01';
 
-    const recordsArray = Object.keys(this.records).map(name => ({
-      full_name: name,
-      status: this.records[name]
-    }));
+    // ส่งรายชื่อสมาชิกทุกคน 53 คนเสมอ เพื่อซิงค์สถานะจริงลงชีต (คนที่ยังไม่กด จะส่งเป็น 'ยังไม่เช็ค')
+    const allStudents = (this.students && this.students.length > 0) ? this.students : [];
+    const recordsArray = allStudents.map(st => {
+      const s = this.records[st.full_name];
+      return {
+        full_name: st.full_name,
+        status: (s && s !== 'ยังไม่เช็ค') ? s : 'ยังไม่เช็ค'
+      };
+    });
 
     if (recordsArray.length === 0) return;
 
@@ -247,16 +259,18 @@ const Attendance = {
     const oldText = btn ? btn.textContent : '';
     if (btn) {
       btn.disabled = true;
-      btn.textContent = '⏳ กำลังส่งคำสั่งไป Google Sheet...';
+      btn.textContent = '⏳ กำลังสร้างแท็บใน Google Sheets...';
     }
     try {
       // บันทึกสถานะล่าสุดก่อน
       await this.saveDraft(false);
       const res = await Api.requestGet('generateReport', { sessionId: this.currentSessionId });
       if (res && res.success) {
-        alert('✅ อัปเดตแท็บ "บันทึกผลการเช็คชื่อ" ใน Google Sheets สำเร็จเรียบร้อยแล้ว!\nคุณสามารถเปิดดูแถบนี้ใน Google Sheets ได้ทันที');
+        const sessionTitle = this.currentSession ? this.currentSession.session_title : '';
+        const cleanName = sessionTitle ? `วาระ_${sessionTitle.substring(0, 20)}` : 'แท็บประจำวาระ';
+        alert(`✅ สร้าง/อัปเดตแท็บใน Google Sheets เรียบร้อยแล้ว!\n\n📑 แท็บเฉพาะของวาระนี้: "${cleanName}" (แยกแท็บถาวร ไม่ทับกับวาระอื่น)\n📊 แท็บสรุปล่าสุด: "บันทึกผลการเช็คชื่อ"\n\nคุณสามารถเปิดดูใน Google Sheets ได้ทันทีครับ`);
       } else {
-        alert('⚠️ ระบบบันทึกผลเรียบร้อยแล้ว หากยังไม่เห็นแท็บ กรุณาเปิด Google Sheets แล้วกดรีเฟรช (F5) ครับ');
+        alert('⚠️ บันทึกข้อมูลเรียบร้อยแล้ว หากยังไม่เห็นแท็บใหม่ กรุณาเปิด Google Sheets แล้วกดรีเฟรช (F5) ครับ');
       }
     } catch (err) {
       alert('⚠️ เกิดข้อผิดพลาด: ' + err.message);
@@ -367,14 +381,37 @@ const Attendance = {
     this.triggerAutoSave();
   },
 
-  clearCurrentFilters() {
+  async resetAllAttendance() {
     if (!this.currentSession) {
-      alert('⚠️ ยังไม่ได้เลือกองค์ประชุม');
+      alert('⚠️ ยังไม่ได้เลือกองค์ประชุม!\n\nกรุณาเลือกองค์ประชุมที่กล่องด้านบน หรือกดปุ่ม "+ สร้างองค์ประชุมใหม่" ก่อนครับ');
       return;
     }
+
+    if (!confirm('⚠️ ยืนยันการล้างผลเช็คชื่อทั้งหมดขององค์ประชุมนี้หรือไม่?\n\n(สถานะของทุกคนจะกลับเป็น "ยังไม่เช็ค" ทั้งบนหน้าเว็บและใน Google Sheets ทันที)')) {
+      return;
+    }
+
     this.records = {};
     this.render();
-    this.triggerAutoSave();
+
+    const statusText = document.getElementById('draft-status-indicator');
+    if (statusText) {
+      statusText.innerHTML = '<span class="saving-dot"></span> กำลังรีเซ็ตสถานะทุกคนใน Google Sheet เป็น "ยังไม่เช็ค"...';
+      statusText.className = 'status-text saving';
+    }
+
+    await this.saveDraft(false);
+
+    if (statusText) {
+      const timeStr = new Date().toLocaleTimeString('th-TH');
+      statusText.innerHTML = `✓ รีเซ็ตผลเช็คชื่อเป็น "ยังไม่เช็ค" ครบทุกคนแล้วเมื่อ ${timeStr}`;
+      statusText.className = 'status-text saved';
+    }
+    alert('✅ ล้างผลการเช็คชื่อเรียบร้อยแล้ว ทุกคนกลับเป็น "ยังไม่เช็ค" ทั้งบนหน้าเว็บและใน Google Sheets');
+  },
+
+  clearCurrentFilters() {
+    this.resetAllAttendance();
   },
 
   getFilteredStudents() {
