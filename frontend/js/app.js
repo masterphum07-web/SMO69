@@ -10,6 +10,9 @@ const App = {
     this.updateAuthUI();
     this.updateConnectionStatusBadge();
 
+    // ดึงข้อมูลภาพรวมระบบครั้งแรกเพียงครั้งเดียวเพื่อความเร็วสูงสุด
+    await Api.getInitialData();
+
     // เริ่มต้นโมดูลต่าง ๆ
     await Dashboard.init();
     await Attendance.init();

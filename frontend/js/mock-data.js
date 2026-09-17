@@ -2,7 +2,7 @@
  * Mock Data Engine for offline testing & initial preview
  * สโมสรนักศึกษาปี 2569 (วทก.) รวม 6 สาขาวิชา 53 คน (ไม่มี student_id)
  */
-const MOCK_DATA_KEY = 'smo69_mock_database_v4';
+const MOCK_DATA_KEY = 'smo69_mock_database_v6_clean';
 
 const INITIAL_MOCK_DATA = {
   branches: [
@@ -304,61 +304,13 @@ const INITIAL_MOCK_DATA = {
         "position": "สันทนาการ"
     }
 ],
-  sessions: [
-    {
-      session_id: 'SESS-20260901-01',
-      session_title: 'ปฐมนิเทศสโมสรนักศึกษาปี 69',
-      session_date: '2026-09-01',
-      branch_scope: 'ALL',
-      status: 'submitted',
-      created_by: 'admin01',
-      created_at: '2026-09-01 09:00:00'
-    },
-    {
-      session_id: 'SESS-20260910-02',
-      session_title: 'ประชุมเตรียมงานกีฬาสานสัมพันธ์ วทก.',
-      session_date: '2026-09-10',
-      branch_scope: 'ALL',
-      status: 'submitted',
-      created_by: 'admin01',
-      created_at: '2026-09-10 13:30:00'
-    },
-    {
-      session_id: 'SESS-20260917-03',
-      session_title: 'องค์ประชุมสโมสรนักศึกษาประจำสัปดาห์',
-      session_date: '2026-09-17',
-      branch_scope: 'ALL',
-      status: 'draft',
-      created_by: 'admin01',
-      created_at: '2026-09-17 17:00:00'
-    }
-  ],
+  sessions: [],
   attendance: [],
   admins: [
     { admin_id: 'admin01', pin: '1234', role: 'admin', name: 'แอดมินสโมสร' },
     { admin_id: 'checker01', pin: '1234', role: 'checker', name: 'ผู้เช็คชื่อประจำวัน' }
   ]
 };
-
-const s1_statuses = ['มา', 'มา', 'มา', 'สาย', 'มา', 'มา', 'ลา', 'มา', 'ขาด', 'มา'];
-const s2_statuses = ['มา', 'สาย', 'มา', 'มา', 'มา', 'ขาด', 'มา', 'ลา', 'มา', 'มา'];
-
-students.forEach((st, idx) => {
-  INITIAL_MOCK_DATA.attendance.push({
-    session_id: 'SESS-20260901-01',
-    full_name: st.full_name,
-    status: s1_statuses[idx % s1_statuses.length],
-    checked_by: 'admin01',
-    timestamp: '2026-09-01 09:05:00'
-  });
-  INITIAL_MOCK_DATA.attendance.push({
-    session_id: 'SESS-20260910-02',
-    full_name: st.full_name,
-    status: s2_statuses[idx % s2_statuses.length],
-    checked_by: 'admin01',
-    timestamp: '2026-09-10 13:35:00'
-  });
-});
 
 const MockDB = {
   get() {

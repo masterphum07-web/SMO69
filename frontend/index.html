@@ -5,13 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ระบบเช็คชื่อสโมสรนักศึกษาปี 69 | วิทยาลัยเทคโนโลยีทางการแพทย์และสาธารณสุข กาญจนาภิเษก</title>
   
-  <!-- Google Fonts: Prompt, Kanit, Chakra Petch, Inter (ฟอนต์สไตล์โมเดิร์นล้ำยุคตามรูปอ้างอิง) -->
+  <!-- Google Fonts: Prompt & Sarabun (ฟอนต์สไตล์ทางการ สถาบันการศึกษา คมชัดและน่าเชื่อถือ) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Inter:wght@300;400;500;600;700;800&family=Kanit:wght@300;400;500;600;700;800;900&family=Prompt:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Sarabun:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
 
   <link rel="stylesheet" href="css/style.css">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📋</text></svg>">
+  <link rel="icon" type="image/png" href="assets/logo.png">
 </head>
 <body>
 
@@ -19,7 +19,7 @@
   <header class="site-header">
     <div class="header-container">
       <div class="brand-section">
-        <div class="brand-logo-badge">วทก.</div>
+        <img src="assets/logo.png" alt="ตราสัญลักษณ์ วทก." class="header-college-logo">
         <div class="brand-titles">
           <h1>ระบบเช็คชื่อสโมสรนักศึกษาปี 69</h1>
           <div class="subtitle">วิทยาลัยเทคโนโลยีทางการแพทย์และสาธารณสุข กาญจนาภิเษก</div>
@@ -70,6 +70,18 @@
 
     <!-- TAB 1: PUBLIC STATS & LEADERBOARD -->
     <section id="tab-public" class="tab-pane active">
+      <!-- Institutional College Header Banner -->
+      <div class="institution-hero-card">
+        <div class="hero-crest-wrap">
+          <img src="assets/logo.png" alt="ตราสัญลักษณ์ วิทยาลัยเทคโนโลยีทางการแพทย์และสาธารณสุข กาญจนาภิเษก" class="hero-college-crest">
+        </div>
+        <div class="hero-info-wrap">
+          <div class="hero-eyebrow">ระบบสารสนเทศกิจการนักศึกษา • สโมสรนักศึกษาปีการศึกษา 2569</div>
+          <h2 class="hero-college-name">วิทยาลัยเทคโนโลยีทางการแพทย์และสาธารณสุข กาญจนาภิเษก</h2>
+          <p class="hero-desc">ระบบบันทึกเวลาและตรวจสอบการเข้าร่วมกิจกรรม องค์ประชุมสโมสรนักศึกษา (SMO 69)</p>
+        </div>
+      </div>
+
       <!-- Session Banner ล่าสุด -->
       <div class="session-banner">
         <div>
@@ -362,7 +374,7 @@
           <input type="password" id="login-pin" class="form-input" placeholder="รหัส PIN 4 หลัก" required maxlength="10">
         </div>
         <div id="login-error-msg" class="text-danger text-sm" style="display: none; margin-bottom: 1rem;"></div>
-        <div class="cyber-hint-box">
+        <div class="info-hint-box">
           💡 <b>รหัสทดสอบเบื้องต้น:</b><br>
           • แอดมิน: <code>admin01</code> | PIN: <code>1234</code><br>
           • ผู้เช็คชื่อ: <code>checker01</code> | PIN: <code>1234</code>
@@ -439,7 +451,7 @@
           </label>
         </div>
 
-        <div class="cyber-warning-box">
+        <div class="warning-hint-box">
           📌 <b>คำแนะนำ:</b> ไฟล์โค้ด Google Apps Script ตัวเต็มอยู่ที่ <code>apps-script/Code.gs</code> สามารถก๊อปปี้ไปวางใน Extensions &gt; Apps Script ใน Google Sheets ได้ทันที
         </div>
 

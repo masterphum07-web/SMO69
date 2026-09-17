@@ -10,10 +10,6 @@ const Dashboard = {
   branches: [],
 
   async init() {
-    const bRes = await Api.requestGet('getBranches');
-    if (bRes && bRes.success) {
-      this.branches = bRes.data || [];
-    }
     await this.loadPublicStats();
     this.startRealtimePolling();
   },
@@ -22,7 +18,6 @@ const Dashboard = {
     if (this.pollingTimer) clearInterval(this.pollingTimer);
     const interval = Config.getPollInterval();
     this.pollingTimer = setInterval(async () => {
-      // โหลดเฉพาะเมื่อหน้าเว็บยังเปิดอยู่
       if (!document.hidden) {
         await this.loadPublicStats(true);
       }
@@ -45,36 +40,34 @@ const Dashboard = {
     }
 
     try {
-      // 1. ดึง sessions ล่าสุด
-      const sessRes = await Api.requestGet('getSessions');
-      const sessions = (sessRes && sessRes.success) ? sessRes.data : [];
+      // ดึงข้อมูลทั้งหมดผ่าน getInitialData ครั้งเดียวจบ
+      const initRes = await Api.getInitialData(isBackground);
+      if (initRes && initRes.success && initRes.data) {
+        const d = initRes.data;
+        this.branches = d.branches || [];
 
-      if (sessions.length > 0) {
-        const latestSession = sessions[0];
-        this.renderCurrentSessionBanner(latestSession);
+        // 1. เรนเดอร์ Leaderboard
+        if (d.leaderboard) {
+          this.renderLeaderboard(d.leaderboard);
+        }
 
-        // ดึง attendance ของ session นี้
-        const attRes = await Api.requestGet('getSessionAttendance', { sessionId: latestSession.session_id });
-        const records = (attRes && attRes.success) ? attRes.data : [];
+        // 2. เรนเดอร์ Session ล่าสุด
+        const sessions = d.sessions || [];
+        if (sessions.length > 0) {
+          const latestSession = sessions[0];
+          this.renderCurrentSessionBanner(latestSession);
 
-        // ดึง students
-        const stRes = await Api.requestGet('getStudents');
-        const students = (stRes && stRes.success) ? stRes.data : [];
+          const attRes = await Api.requestGet('getSessionAttendance', { sessionId: latestSession.session_id });
+          const records = (attRes && attRes.success) ? attRes.data : [];
+          this.renderPublicSessionAttendance(latestSession, records, d.students || []);
+        } else {
+          this.renderNoSessionsState();
+        }
 
-        this.renderPublicSessionAttendance(latestSession, records, students);
-      } else {
-        this.renderNoSessionsState();
-      }
-
-      // 2. ดึง Leaderboard
-      const leadRes = await Api.requestGet('getLeaderboard');
-      if (leadRes && leadRes.success && leadRes.data) {
-        this.renderLeaderboard(leadRes.data);
-      }
-
-      if (pollIndicator) {
-        const now = new Date().toLocaleTimeString('th-TH');
-        pollIndicator.innerHTML = `<span class="pulse-dot active"></span> อัปเดตเรียลไทม์ล่าสุดเมื่อ ${now}`;
+        if (pollIndicator) {
+          const now = new Date().toLocaleTimeString('th-TH');
+          pollIndicator.innerHTML = `<span class="pulse-dot active"></span> อัปเดตเรียลไทม์ล่าสุดเมื่อ ${now}`;
+        }
       }
     } catch (err) {
       console.warn('โหลด Public Stats ไม่สำเร็จ:', err);

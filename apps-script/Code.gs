@@ -131,24 +131,18 @@ function setupInitialDatabase() {
   // 2. ชีต Students (53 คน)
   const realStudents = updateStudentsOnly();
 
-  // 3. ชีต Sessions
+  // 3. ชีต Sessions (ตารางว่างพร้อมบันทึกของจริง ไม่มีข้อมูลจำลอง)
   const sessSheet = setSheet(SHEETS.SESSIONS);
   if (sessSheet.getLastRow() === 0) {
     sessSheet.appendRow(['session_id', 'session_title', 'session_date', 'branch_scope', 'status', 'created_by', 'created_at']);
-    const nowStr = Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyy-MM-dd HH:mm:ss');
-    sessSheet.appendRow(['SESS-20260901-01', 'ปฐมนิเทศสโมสรนักศึกษาปี 69', '2026-09-01', 'ALL', 'submitted', 'admin01', nowStr]);
-    formatHeaderRow(sessSheet, '#1E3A8A');
+    formatHeaderRow(sessSheet, '#0F2F57');
   }
 
-  // 4. ชีต Attendance
+  // 4. ชีต Attendance (ตารางว่างพร้อมบันทึกของจริง ไม่มีข้อมูลจำลอง)
   const attSheet = setSheet(SHEETS.ATTENDANCE);
   if (attSheet.getLastRow() === 0) {
     attSheet.appendRow(['session_id', 'full_name', 'status', 'checked_by', 'timestamp']);
-    const nowStr = Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyy-MM-dd HH:mm:ss');
-    for (let i = 0; i < Math.min(10, realStudents.length); i++) {
-      attSheet.appendRow(['SESS-20260901-01', realStudents[i][0], 'มา', 'admin01', nowStr]);
-    }
-    formatHeaderRow(attSheet, '#1E3A8A');
+    formatHeaderRow(attSheet, '#0F2F57');
   }
 
   // 5. ชีต Admins
@@ -157,7 +151,7 @@ function setupInitialDatabase() {
     admSheet.appendRow(['admin_id', 'pin', 'role', 'name']);
     admSheet.appendRow(['admin01', '1234', 'admin', 'แอดมินสโมสร']);
     admSheet.appendRow(['checker01', '1234', 'checker', 'ผู้เช็คชื่อประจำวัน']);
-    formatHeaderRow(admSheet, '#1E3A8A');
+    formatHeaderRow(admSheet, '#0F2F57');
   }
 
   // 6. ชีต Dashboard_Summary
@@ -174,12 +168,31 @@ function setupInitialDatabase() {
     'total_sessions',
     'attendance_rate_pct'
   ]);
-  formatHeaderRow(dashSheet, '#1E3A8A');
+  formatHeaderRow(dashSheet, '#0F2F57');
 
   // อัปเดต Summary รอบแรก
   updateDashboardSummary();
 
-  Logger.log('Setup Initial Database Completed Successfully with 53 students (No student_id) and updated branch codes (PMD, BSC, DIP)!');
+  Logger.log('Setup Initial Database Completed Successfully with 53 students (Clean: No sample data)!');
+}
+
+/**
+ * ⚡ ฟังก์ชันพิเศษ: ล้างข้อมูลจำลององค์ประชุมและประวัติการเช็คชื่อตัวอย่างทั้งหมดในชีตจริง
+ * เหลือเฉพาะหัวตาราง เพื่อให้ระบบพร้อมใช้งานจริงแบบคลีน 100%
+ */
+function clearAllSampleData() {
+  const sessSheet = setSheet(SHEETS.SESSIONS);
+  sessSheet.clear();
+  sessSheet.appendRow(['session_id', 'session_title', 'session_date', 'branch_scope', 'status', 'created_by', 'created_at']);
+  formatHeaderRow(sessSheet, '#0F2F57');
+
+  const attSheet = setSheet(SHEETS.ATTENDANCE);
+  attSheet.clear();
+  attSheet.appendRow(['session_id', 'full_name', 'status', 'checked_by', 'timestamp']);
+  formatHeaderRow(attSheet, '#0F2F57');
+
+  updateDashboardSummary();
+  Logger.log('✅ ลบข้อมูลจำลองทั้งหมดใน Google Sheet เรียบร้อยแล้ว!');
 }
 
 function formatHeaderRow(sheet, bgColor) {

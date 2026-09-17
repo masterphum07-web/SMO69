@@ -18,43 +18,54 @@ const Attendance = {
     await this.loadInitialData();
   },
 
-  async loadInitialData() {
-    // โหลดสาขา
+  async loadInitialData(force = false) {
+    // 1. ถ้ามีข้อมูลแคชอยู่แล้ว นำมาแสดงผลทันที (เร็วใน 0 ms)
+    if (!force && Api.cache.initialData) {
+      const d = Api.cache.initialData;
+      this.branches = d.branches || [];
+      this.students = d.students || [];
+      this.populateSessions(d.sessions || []);
+      return;
+    }
+
+    // 2. ดึงผ่าน Api.getInitialData() แบบครั้งเดียวจบ
+    const initRes = await Api.getInitialData(force);
+    if (initRes && initRes.success && initRes.data) {
+      const d = initRes.data;
+      this.branches = d.branches || [];
+      this.students = d.students || [];
+      this.populateSessions(d.sessions || []);
+      return;
+    }
+
+    // 3. Fallback ดึงทีละส่วนหากจำเป็น
     const bRes = await Api.requestGet('getBranches');
-    if (bRes && bRes.success) {
-      this.branches = bRes.data || [];
-    }
-
-    // โหลดรายชื่อนักศึกษาทั้งหมด
+    if (bRes && bRes.success) this.branches = bRes.data || [];
     const sRes = await Api.requestGet('getStudents');
-    if (sRes && sRes.success) {
-      this.students = sRes.data || [];
-    }
-
-    // โหลด sessions
+    if (sRes && sRes.success) this.students = sRes.data || [];
     await this.loadSessionsList();
   },
 
-  async loadSessionsList() {
-    const res = await Api.requestGet('getSessions');
+  populateSessions(sessions) {
     const select = document.getElementById('session-select');
     if (!select) return;
 
     select.innerHTML = '';
-    const sessions = (res && res.success) ? res.data : [];
+    const sessList = Array.isArray(sessions) ? sessions : [];
 
-    if (sessions.length === 0) {
-      select.innerHTML = '<option value="">-- ยังไม่มีองค์ประชุม (กรุณากดสร้างใหม่) --</option>';
+    if (sessList.length === 0) {
+      select.innerHTML = '<option value="">-- ยังไม่มีองค์ประชุม (กรุณากด "+ สร้างองค์ประชุมใหม่") --</option>';
       this.currentSessionId = null;
       this.currentSession = null;
+      this.records = {};
       this.render();
       return;
     }
 
-    sessions.forEach((s, idx) => {
+    sessList.forEach((s, idx) => {
       const opt = document.createElement('option');
       opt.value = s.session_id;
-      const statusBadge = s.status === 'submitted' ? '✅ [ส่งแล้ว]' : '📝 [แบบร่าง]';
+      const statusBadge = s.status === 'submitted' ? '✅ [สรุปผลแล้ว]' : '📝 [แบบร่าง]';
       opt.textContent = `${statusBadge} ${s.session_title} (${s.session_date})`;
       if (idx === 0 && !this.currentSessionId) {
         opt.selected = true;
@@ -64,14 +75,24 @@ const Attendance = {
       select.appendChild(opt);
     });
 
-    if (!this.currentSessionId && sessions.length > 0) {
-      this.currentSessionId = sessions[0].session_id;
-      this.currentSession = sessions[0];
+    if (!this.currentSessionId && sessList.length > 0) {
+      this.currentSessionId = sessList[0].session_id;
+      this.currentSession = sessList[0];
     } else {
-      this.currentSession = sessions.find(s => s.session_id === this.currentSessionId) || sessions[0];
+      this.currentSession = sessList.find(s => s.session_id === this.currentSessionId) || sessList[0];
     }
 
-    await this.loadSessionAttendance(this.currentSessionId);
+    if (this.currentSessionId) {
+      this.loadSessionAttendance(this.currentSessionId);
+    } else {
+      this.render();
+    }
+  },
+
+  async loadSessionsList() {
+    const res = await Api.requestGet('getSessions');
+    const sessions = (res && res.success) ? res.data : [];
+    this.populateSessions(sessions);
   },
 
   async loadSessionAttendance(sessionId) {
@@ -276,6 +297,12 @@ const Attendance = {
   render() {
     const container = document.getElementById('attendance-table-body');
     if (!container) return;
+
+    if (!this.currentSession) {
+      container.innerHTML = `<tr><td colspan="4" class="empty-state" style="padding: 3rem 1rem; text-align: center; color: var(--text-muted); font-size: 0.95rem;">📋 ยังไม่มีการเปิดองค์ประชุม กรุณากดปุ่ม <b>"+ สร้างองค์ประชุมใหม่"</b> ด้านบนเพื่อเริ่มการเช็คชื่อ</td></tr>`;
+      this.updateSummaryCounts();
+      return;
+    }
 
     const filtered = this.getFilteredStudents();
     container.innerHTML = '';
