@@ -528,7 +528,7 @@ body {
 /* ---------------- LEADERBOARD ---------------- */
 .leaderboard-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
   gap: 1.25rem;
   margin-bottom: 1.5rem;
 }
@@ -539,61 +539,159 @@ body {
   border-radius: var(--radius-md);
   padding: 1.25rem;
   box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
 }
 
 .leaderboard-title {
   font-family: var(--font-display);
-  font-size: 0.95rem;
-  font-weight: 600;
+  font-size: 0.98rem;
+  font-weight: 700;
   display: flex;
   align-items: center;
-  gap: 0.45rem;
-  padding-bottom: 0.75rem;
+  gap: 0.5rem;
+  padding-bottom: 0.85rem;
   border-bottom: 1px solid var(--border-color);
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.leaderboard-title.text-success {
+  color: var(--status-present);
+}
+
+.leaderboard-title.text-danger {
+  color: var(--status-absent);
 }
 
 .leaderboard-list {
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0;
 }
 
 .leaderboard-item {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0.55rem 0.75rem;
-  background-color: var(--bg-page);
+  gap: 0.85rem;
+  padding: 0.65rem 0.85rem;
+  background-color: #FAFBFD;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--border-light);
-  font-size: 0.88rem;
-  transition: background-color 0.15s ease;
+  border: 1px solid var(--border-color);
+  transition: all 0.2s ease;
 }
 
 .leaderboard-item:hover {
-  background-color: #EEF2F6;
+  background-color: #F1F5F9;
+  border-color: #CBD5E1;
+  transform: translateX(3px);
 }
 
-.leaderboard-rank {
+.rank-badge {
   font-family: var(--font-display);
   font-weight: 700;
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  font-size: 0.82rem;
+  color: #FFFFFF;
+  flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.rank-badge.rank-1 {
+  background: linear-gradient(135deg, #F59E0B, #D97706);
+}
+
+.rank-badge.rank-2 {
+  background: linear-gradient(135deg, #94A3B8, #64748B);
+}
+
+.rank-badge.rank-3 {
+  background: linear-gradient(135deg, #F97316, #C2410C);
+}
+
+.rank-badge.rank-other {
+  background-color: #64748B;
+}
+
+.rank-badge.rank-absent {
+  background-color: #EF4444;
+}
+
+.leaderboard-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.leaderboard-name {
+  font-family: var(--font-display);
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--navy-900);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.leaderboard-sub {
+  font-family: var(--font-body);
   font-size: 0.78rem;
-  margin-right: 0.6rem;
-  background-color: #E2E8F0;
+  color: var(--text-muted);
+  margin-top: 0.15rem;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.branch-pill-mini {
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.1rem 0.45rem;
+  border-radius: var(--radius-xs);
+  background-color: var(--navy-50);
+  color: var(--navy-700);
+  border: 1px solid var(--navy-200);
+}
+
+.pos-text {
+  font-size: 0.76rem;
   color: var(--text-secondary);
 }
 
-.rank-1 .leaderboard-rank { background-color: #FDE68A; color: #92400E; }
-.rank-2 .leaderboard-rank { background-color: #E2E8F0; color: #334155; }
-.rank-3 .leaderboard-rank { background-color: #FED7AA; color: #9A3412; }
+.leaderboard-score {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 700;
+  white-space: nowrap;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.rate-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.15rem 0.45rem;
+  border-radius: var(--radius-pill);
+  background-color: #DCFCE7;
+  color: #15803D;
+  margin-left: 0.25rem;
+  border: 1px solid #86EFAC;
+}
+
+.empty-text {
+  text-align: center;
+  padding: 1.5rem 1rem;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+}
 
 /* ---------------- CONTENT CARD & WRAPPERS ---------------- */
 .content-card {
@@ -744,17 +842,59 @@ body {
   border-bottom: none;
 }
 
+/* Student Name & Badges in Tables */
+.name-box {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+
+.student-name {
+  font-family: var(--font-display);
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--navy-900);
+}
+
+.branch-badge {
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.18rem 0.6rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid currentColor;
+  white-space: nowrap;
+  line-height: 1.2;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.position-badge {
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: #1E3A8A;
+  background-color: #EFF6FF;
+  border: 1px solid #BFDBFE;
+  padding: 0.15rem 0.55rem;
+  border-radius: var(--radius-xs);
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
 /* Status Badges */
 .status-badge {
   font-family: var(--font-display);
-  font-size: 0.75rem;
+  font-size: 0.76rem;
   font-weight: 600;
-  padding: 0.25rem 0.65rem;
+  padding: 0.25rem 0.75rem;
   border-radius: var(--radius-pill);
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 0.3rem;
   white-space: nowrap;
+  letter-spacing: 0.01em;
 }
 
 .status-present {

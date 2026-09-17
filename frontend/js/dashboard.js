@@ -8,6 +8,13 @@ const Dashboard = {
   pollingTimer: null,
   isPollingActive: false,
   branches: [],
+  publicSessions: [],
+  selectedPublicSessionId: null,
+  publicStudents: [],
+  publicAttendanceRecords: [],
+  publicAttendanceMap: {},
+  publicBranchFilter: 'ALL',
+  publicSearchQuery: '',
 
   async init() {
     await this.loadPublicStats();
@@ -45,24 +52,29 @@ const Dashboard = {
       if (initRes && initRes.success && initRes.data) {
         const d = initRes.data;
         this.branches = d.branches || [];
+        this.publicStudents = d.students || [];
+        this.publicSessions = d.sessions || [];
 
         // 1. เรนเดอร์ Leaderboard
         if (d.leaderboard) {
           this.renderLeaderboard(d.leaderboard);
         }
 
-        // 2. เรนเดอร์ Session ล่าสุด
-        const sessions = d.sessions || [];
-        if (sessions.length > 0) {
-          const latestSession = sessions[0];
-          this.renderCurrentSessionBanner(latestSession);
+        // 2. เติมตัวเลือก Dropdown วาระหน้าแรก
+        this.populatePublicSessionSelect();
 
-          const attRes = await Api.requestGet('getSessionAttendance', { sessionId: latestSession.session_id });
-          const records = (attRes && attRes.success) ? attRes.data : [];
-          this.renderPublicSessionAttendance(latestSession, records, d.students || []);
+        // 3. กำหนด Session ที่เลือก (เริ่มต้นเป็นวาระแรก/ล่าสุด)
+        if (this.publicSessions.length > 0) {
+          if (!this.selectedPublicSessionId || !this.publicSessions.some(s => s.session_id === this.selectedPublicSessionId)) {
+            this.selectedPublicSessionId = this.publicSessions[0].session_id;
+          }
+          await this.loadSelectedPublicSession(this.selectedPublicSessionId);
         } else {
           this.renderNoSessionsState();
         }
+
+        // 4. เรนเดอร์ปุ่มกรองสาขาในตารางหน้าแรก
+        this.renderPublicBranchFilters();
 
         if (pollIndicator) {
           const now = new Date().toLocaleTimeString('th-TH');
@@ -77,13 +89,70 @@ const Dashboard = {
     }
   },
 
+  populatePublicSessionSelect() {
+    const select = document.getElementById('public-session-select');
+    if (!select) return;
+
+    select.innerHTML = '';
+    if (!this.publicSessions || this.publicSessions.length === 0) {
+      select.innerHTML = '<option value="">-- ยังไม่มีองค์ประชุม --</option>';
+      return;
+    }
+
+    this.publicSessions.forEach((s, idx) => {
+      const opt = document.createElement('option');
+      opt.value = s.session_id;
+      const isLatest = (idx === 0) ? '📌 [วาระล่าสุด] ' : '';
+      const statusBadge = (s.status === 'submitted') ? '✅ ' : '📝 ';
+      opt.textContent = `${isLatest}${statusBadge}${s.session_title} (${s.session_date})`;
+      if (s.session_id === this.selectedPublicSessionId) {
+        opt.selected = true;
+      }
+      select.appendChild(opt);
+    });
+  },
+
+  async onPublicSessionChange(sessionId) {
+    if (sessionId) {
+      await this.loadSelectedPublicSession(sessionId);
+    }
+  },
+
+  async loadSelectedPublicSession(sessionId) {
+    if (!sessionId) return;
+    this.selectedPublicSessionId = sessionId;
+
+    const session = this.publicSessions.find(s => s.session_id === sessionId) || this.publicSessions[0];
+    if (!session) return;
+
+    this.renderCurrentSessionBanner(session);
+
+    // ดึงข้อมูลการเช็คชื่อของ session นี้
+    const attRes = await Api.requestGet('getSessionAttendance', { sessionId: session.session_id });
+    const records = (attRes && attRes.success && Array.isArray(attRes.data)) ? attRes.data : [];
+    this.publicAttendanceRecords = records;
+
+    // สร้าง Map โดยใช้ชื่อ-สกุลจริง (และ student_id เผื่อไว้)
+    this.publicAttendanceMap = {};
+    records.forEach(r => {
+      const key = r.full_name || r.student_id;
+      if (key) {
+        this.publicAttendanceMap[key] = r.status;
+      }
+    });
+
+    // คำนวณสถิติ Card และเรนเดอร์ตาราง
+    this.updatePublicStatCards();
+    this.renderPublicTable();
+  },
+
   renderCurrentSessionBanner(session) {
     const titleEl = document.getElementById('public-session-title');
     const dateEl = document.getElementById('public-session-date');
     const badgeEl = document.getElementById('public-session-badge');
 
     if (titleEl) titleEl.textContent = session.session_title;
-    if (dateEl) dateEl.textContent = `วันที่จัดประชุม: ${session.session_date}`;
+    if (dateEl) dateEl.textContent = `วันที่จัดประชุม: ${session.session_date} | สาขาวิชา: ${session.branch_scope || 'ALL'}`;
     if (badgeEl) {
       const isSubmitted = session.status === 'submitted';
       badgeEl.className = `status-badge ${isSubmitted ? 'status-present' : 'status-late'}`;
@@ -94,15 +163,14 @@ const Dashboard = {
   renderNoSessionsState() {
     const titleEl = document.getElementById('public-session-title');
     if (titleEl) titleEl.textContent = 'ยังไม่มีองค์ประชุมการเช็คชื่อในระบบ';
+    const tbody = document.getElementById('public-attendance-tbody');
+    if (tbody) tbody.innerHTML = '<tr><td colspan="3" class="empty-state" style="padding: 2.5rem 1rem; text-align: center; color: var(--text-muted);">ยังไม่มีข้อมูลองค์ประชุมในระบบ</td></tr>';
   },
 
-  renderPublicSessionAttendance(session, records, students) {
-    const map = {};
-    records.forEach(r => { map[r.student_id] = r.status; });
-
+  updatePublicStatCards() {
     let present = 0, late = 0, excused = 0, absent = 0, pending = 0;
-    students.forEach(s => {
-      const st = map[s.student_id];
+    this.publicStudents.forEach(s => {
+      const st = this.publicAttendanceMap[s.full_name];
       if (st === 'มา') present++;
       else if (st === 'สาย') late++;
       else if (st === 'ลา') excused++;
@@ -120,15 +188,97 @@ const Dashboard = {
     setVal('pub-stat-excused', excused);
     setVal('pub-stat-absent', absent);
     setVal('pub-stat-pending', pending);
-    setVal('pub-stat-total', students.length);
+    setVal('pub-stat-total', this.publicStudents.length);
 
-    // ตารางรายชื่อ
+    // อัปเดต Summary Bar บนตาราง
+    setVal('pub-filter-present', present);
+    setVal('pub-filter-late', late);
+    setVal('pub-filter-excused', excused);
+    setVal('pub-filter-absent', absent);
+    setVal('pub-filter-pending', pending);
+    setVal('pub-filter-total', this.publicStudents.length);
+  },
+
+  onPublicSearch(query) {
+    this.publicSearchQuery = query || '';
+    this.renderPublicTable();
+  },
+
+  setPublicBranchFilter(branchId) {
+    this.publicBranchFilter = branchId || 'ALL';
+    this.renderPublicBranchFilters();
+    this.renderPublicTable();
+  },
+
+  renderPublicBranchFilters() {
+    const container = document.getElementById('public-branch-filter-container');
+    if (!container) return;
+
+    const list = [
+      { id: 'ALL', name: 'ทั้งหมด' },
+      { id: 'RT', name: 'รังสีเทคนิค' },
+      { id: 'HCI', name: 'นวัตกรรมฯ' },
+      { id: 'PMD', name: 'ฉุกเฉินฯ' },
+      { id: 'BSC', name: 'วท.บ.เวชฯ' },
+      { id: 'TTM', name: 'แพทย์แผนไทย' },
+      { id: 'DIP', name: 'ปวส.เวชฯ' }
+    ];
+
+    container.innerHTML = '';
+    list.forEach(b => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `filter-chip ${this.publicBranchFilter === b.id ? 'active' : ''}`;
+      btn.textContent = b.name;
+      btn.onclick = () => this.setPublicBranchFilter(b.id);
+      container.appendChild(btn);
+    });
+  },
+
+  getFilteredPublicStudents() {
+    return this.publicStudents.filter(st => {
+      let matchBranch = (this.publicBranchFilter === 'ALL');
+      if (!matchBranch) {
+        if (this.publicBranchFilter === 'PMD' || this.publicBranchFilter === 'EMT') {
+          matchBranch = (st.branch_id === 'PMD' || st.branch_id === 'EMT');
+        } else if (this.publicBranchFilter === 'BSC' || this.publicBranchFilter === 'MR_BSC') {
+          matchBranch = (st.branch_id === 'BSC' || st.branch_id === 'MR_BSC');
+        } else if (this.publicBranchFilter === 'DIP' || this.publicBranchFilter === 'MR_DIP') {
+          matchBranch = (st.branch_id === 'DIP' || st.branch_id === 'MR_DIP');
+        } else {
+          matchBranch = (st.branch_id === this.publicBranchFilter);
+        }
+      }
+      const q = this.publicSearchQuery.trim().toLowerCase();
+      const matchSearch = !q ||
+        st.full_name.toLowerCase().includes(q) ||
+        (st.position && st.position.toLowerCase().includes(q));
+      return matchBranch && matchSearch;
+    });
+  },
+
+  renderPublicTable() {
+    const heading = document.getElementById('public-table-heading');
+    const session = this.publicSessions.find(s => s.session_id === this.selectedPublicSessionId);
+    if (heading && session) {
+      const isLatest = (this.publicSessions.length > 0 && this.publicSessions[0].session_id === session.session_id);
+      const prefix = isLatest ? '📌 วาระล่าสุด: ' : '📑 วาระ: ';
+      heading.textContent = `${prefix}${session.session_title} (${session.session_date})`;
+    }
+
     const tbody = document.getElementById('public-attendance-tbody');
     if (!tbody) return;
 
+    const filtered = this.getFilteredPublicStudents();
     tbody.innerHTML = '';
-    students.forEach((st, idx) => {
-      const currentStatus = map[st.full_name] || map[st.student_id] || '';
+
+    if (filtered.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="3" class="empty-state" style="padding: 2.5rem 1rem; text-align: center; color: var(--text-muted);">ไม่พบข้อมูลสมาชิกตามเงื่อนไขที่เลือก</td></tr>`;
+      return;
+    }
+
+    filtered.forEach((st, idx) => {
+      const currentStatus = this.publicAttendanceMap[st.full_name] || '';
       const branch = this.branches.find(b => {
         if (b.branch_id === st.branch_id) return true;
         if ((st.branch_id === 'EMT' && b.branch_id === 'PMD') || (st.branch_id === 'PMD' && b.branch_id === 'EMT')) return true;
@@ -137,21 +287,38 @@ const Dashboard = {
         return false;
       }) || { branch_name: st.branch_id, color_hex: '#6B7280' };
 
+      const statusClass = this.getStatusClass(currentStatus);
+      let statusIcon = '⏳';
+      let statusText = currentStatus || 'ยังไม่เช็ค';
+
+      if (currentStatus === 'มา') {
+        statusIcon = '✅';
+      } else if (currentStatus === 'สาย') {
+        statusIcon = '⏰';
+        statusText = 'มาสาย';
+      } else if (currentStatus === 'ลา') {
+        statusIcon = '✉️';
+        statusText = 'ขอลา';
+      } else if (currentStatus === 'ขาด') {
+        statusIcon = '❌';
+        statusText = 'ขาด';
+      }
+
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td class="text-center font-mono text-muted">${idx + 1}</td>
+        <td class="text-center font-semibold text-muted">${idx + 1}</td>
         <td>
           <div class="name-box">
             <span class="student-name">${st.full_name}</span>
-            <span class="branch-badge" style="background-color: ${branch.color_hex}20; color: ${branch.color_hex}; border-color: ${branch.color_hex}50">
+            <span class="branch-badge" style="background-color: ${branch.color_hex}15; color: ${branch.color_hex}; border-color: ${branch.color_hex}40;">
               ${branch.branch_name}
             </span>
             ${st.position ? `<span class="position-badge">${st.position}</span>` : ''}
           </div>
         </td>
         <td class="text-center">
-          <span class="status-badge status-${this.getStatusClass(currentStatus)}">
-            ${currentStatus || 'ยังไม่เช็ค'}
+          <span class="status-badge status-${statusClass}">
+            ${statusIcon} ${statusText}
           </span>
         </td>
       `;
@@ -160,25 +327,30 @@ const Dashboard = {
   },
 
   renderLeaderboard(data) {
-    // Top Present
+    // 1. Top Present (เข้าประชุมมากสุด)
     const topPresentList = document.getElementById('leaderboard-top-present');
     if (topPresentList) {
       topPresentList.innerHTML = '';
       if (!data.topPresent || data.topPresent.length === 0) {
-        topPresentList.innerHTML = '<li class="empty-text">ยังไม่มีข้อมูลสรุป</li>';
+        topPresentList.innerHTML = '<li class="empty-text">ยังไม่มีข้อมูลสรุปการเข้าร่วม</li>';
       } else {
         data.topPresent.forEach((st, i) => {
-          const rankColors = ['#F59E0B', '#94A3B8', '#B45309', '#64748B', '#64748B'];
+          const rankClass = (i === 0) ? 'rank-1' : (i === 1) ? 'rank-2' : (i === 2) ? 'rank-3' : 'rank-other';
+          const medal = (i === 0) ? '🥇' : (i === 1) ? '🥈' : (i === 2) ? '🥉' : `${i + 1}`;
           const li = document.createElement('li');
           li.className = 'leaderboard-item';
           li.innerHTML = `
-            <div class="rank-badge" style="background-color: ${rankColors[i] || '#64748B'}">${i + 1}</div>
+            <div class="rank-badge ${rankClass}">${medal}</div>
             <div class="leaderboard-info">
               <div class="leaderboard-name">${st.full_name}</div>
-              <div class="leaderboard-sub text-muted font-mono">สาขา ${st.branch_id} ${st.position ? `• ${st.position}` : ''}</div>
+              <div class="leaderboard-sub">
+                <span class="branch-pill-mini">สาขา ${st.branch_id}</span>
+                ${st.position ? `<span class="pos-text">• ${st.position}</span>` : ''}
+              </div>
             </div>
-            <div class="leaderboard-score text-success font-semibold">
-              ${st.present + st.late} ครั้ง <span class="rate-badge">(${st.rate})</span>
+            <div class="leaderboard-score text-success">
+              ${st.present + st.late} <span style="font-size: 0.78rem; font-weight: normal; color: var(--text-muted);">ครั้ง</span>
+              <span class="rate-badge">(${st.rate})</span>
             </div>
           `;
           topPresentList.appendChild(li);
@@ -186,12 +358,12 @@ const Dashboard = {
       }
     }
 
-    // Top Absent
+    // 2. Top Absent (ขาดกิจกรรมมากสุด)
     const topAbsentList = document.getElementById('leaderboard-top-absent');
     if (topAbsentList) {
       topAbsentList.innerHTML = '';
       if (!data.topAbsent || data.topAbsent.length === 0) {
-        topAbsentList.innerHTML = '<li class="empty-text">ยังไม่มีข้อมูลสรุป</li>';
+        topAbsentList.innerHTML = '<li class="empty-text">ไม่มีสมาชิกที่ขาดประชุม</li>';
       } else {
         data.topAbsent.forEach((st, i) => {
           const li = document.createElement('li');
@@ -200,10 +372,13 @@ const Dashboard = {
             <div class="rank-badge rank-absent">${i + 1}</div>
             <div class="leaderboard-info">
               <div class="leaderboard-name">${st.full_name}</div>
-              <div class="leaderboard-sub text-muted font-mono">สาขา ${st.branch_id} ${st.position ? `• ${st.position}` : ''}</div>
+              <div class="leaderboard-sub">
+                <span class="branch-pill-mini">สาขา ${st.branch_id}</span>
+                ${st.position ? `<span class="pos-text">• ${st.position}</span>` : ''}
+              </div>
             </div>
-            <div class="leaderboard-score text-danger font-semibold">
-              ${st.absent} ครั้ง
+            <div class="leaderboard-score text-danger">
+              ${st.absent} <span style="font-size: 0.78rem; font-weight: normal; color: var(--text-muted);">ครั้ง</span>
             </div>
           `;
           topAbsentList.appendChild(li);
