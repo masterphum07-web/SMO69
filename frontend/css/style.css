@@ -529,6 +529,17 @@ body {
   white-space: nowrap;
 }
 
+.position-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius-sm);
+  background-color: #F8FAFC;
+  color: #475569;
+  border: 1px solid #CBD5E1;
+  white-space: nowrap;
+}
+
 /* ---------------- STATUS BADGES & BUTTONS ---------------- */
 .status-badge {
   display: inline-flex;

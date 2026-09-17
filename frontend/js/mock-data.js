@@ -1,29 +1,362 @@
 /**
  * Mock Data Engine for offline testing & initial preview
- * ตามสเปก Master Prompt (Branches, Students, Sessions, Attendance, Admins, Dashboard)
+ * สโมสรนักศึกษาปี 2569 (วทก.) รวม 6 สาขาวิชา 53 คน
  */
-const MOCK_DATA_KEY = 'smo69_mock_database_v1';
+const MOCK_DATA_KEY = 'smo69_mock_database_v2';
 
 const INITIAL_MOCK_DATA = {
   branches: [
-    { branch_id: 'RT01', branch_name: 'รังสีเทคนิค', color_hex: '#2563EB' },
-    { branch_id: 'PH01', branch_name: 'สาธารณสุขชุมชน', color_hex: '#10B981' },
-    { branch_id: 'DT01', branch_name: 'ทันตสาธารณสุข', color_hex: '#F59E0B' }
-  ],
+    {
+        "branch_id": "RT",
+        "branch_name": "รังสีเทคนิค",
+        "color_hex": "#2563EB"
+    },
+    {
+        "branch_id": "HCI",
+        "branch_name": "นวัตกรรมสื่อสารสุขภาพ",
+        "color_hex": "#8B5CF6"
+    },
+    {
+        "branch_id": "EMT",
+        "branch_name": "ฉุกเฉินการแพทย์",
+        "color_hex": "#EF4444"
+    },
+    {
+        "branch_id": "MR_BSC",
+        "branch_name": "วท.บ.เวชระเบียน",
+        "color_hex": "#06B6D4"
+    },
+    {
+        "branch_id": "TTM",
+        "branch_name": "การแพทย์แผนไทย",
+        "color_hex": "#10B981"
+    },
+    {
+        "branch_id": "MR_DIP",
+        "branch_name": "ปวส.เวชระเบียน",
+        "color_hex": "#F59E0B"
+    }
+],
   students: [
-    { student_id: '6911001', full_name: 'กิตติศักดิ์ เจริญผล', branch_id: 'RT01' },
-    { student_id: '6911002', full_name: 'จิราพร วงศ์สวัสดิ์', branch_id: 'RT01' },
-    { student_id: '6911003', full_name: 'ชานนท์ สิทธิพงศ์', branch_id: 'RT01' },
-    { student_id: '6911004', full_name: 'ณัฐวุฒิ บุญมี', branch_id: 'RT01' },
-    { student_id: '6912001', full_name: 'ธนากร ภักดีชน', branch_id: 'PH01' },
-    { student_id: '6912002', full_name: 'เบญจมาศ ศรีสุข', branch_id: 'PH01' },
-    { student_id: '6912003', full_name: 'ปิยะวัฒน์ ทองหล่อ', branch_id: 'PH01' },
-    { student_id: '6912004', full_name: 'พิมลดา สุวรรณโชติ', branch_id: 'PH01' },
-    { student_id: '6913001', full_name: 'วรินทร ดำรงเกียรติ', branch_id: 'DT01' },
-    { student_id: '6913002', full_name: 'ศิริพร บุญรักษา', branch_id: 'DT01' },
-    { student_id: '6913003', full_name: 'อนันดา พงษ์ศิริ', branch_id: 'DT01' },
-    { student_id: '6913004', full_name: 'อาริยา สมบูรณ์', branch_id: 'DT01' }
-  ],
+    {
+        "student_id": "69101",
+        "full_name": "นางสาวภัทรวรินทร์ เกษมสุข",
+        "branch_id": "RT",
+        "position": "นายก"
+    },
+    {
+        "student_id": "69102",
+        "full_name": "นางสาวประภัสสร วงษ์กำภู",
+        "branch_id": "RT",
+        "position": "ฝ่ายเลขานุการ (เฮด)"
+    },
+    {
+        "student_id": "69103",
+        "full_name": "นายบดินทร์ การุณเวทย์",
+        "branch_id": "RT",
+        "position": "ฝ่ายเหรัญญิก"
+    },
+    {
+        "student_id": "69104",
+        "full_name": "นายภูมิภัทร สว่างเวียง",
+        "branch_id": "RT",
+        "position": "ฝ่ายวิชาการ"
+    },
+    {
+        "student_id": "69105",
+        "full_name": "นางสาวดอกรัก อิสระอังกูร",
+        "branch_id": "RT",
+        "position": "ฝ่ายประสานงาน (เฮด)"
+    },
+    {
+        "student_id": "69106",
+        "full_name": "นางสาวอัญญานี อาสะหนิ",
+        "branch_id": "RT",
+        "position": "ฝ่ายประชาสัมพันธ์"
+    },
+    {
+        "student_id": "69107",
+        "full_name": "นางสาวพิมพ์พันธุ์ กล่องทอง",
+        "branch_id": "RT",
+        "position": "ฝ่ายกิจกรรม (เฮด)"
+    },
+    {
+        "student_id": "69108",
+        "full_name": "นายศรัณย์ อินทรีย์",
+        "branch_id": "RT",
+        "position": "ฝ่ายโสต"
+    },
+    {
+        "student_id": "69109",
+        "full_name": "นางสาวจินตนา ศรีเริ่มสกุล",
+        "branch_id": "RT",
+        "position": "ฝ่ายสถานที่ (เฮด)"
+    },
+    {
+        "student_id": "69201",
+        "full_name": "นางสาวจุฑามณี สมบัติ",
+        "branch_id": "HCI",
+        "position": "อุปนายก"
+    },
+    {
+        "student_id": "69202",
+        "full_name": "นางสาวณัจมีย์ ปูเตะ",
+        "branch_id": "HCI",
+        "position": "ฝ่ายประชาสัมพันธ์"
+    },
+    {
+        "student_id": "69203",
+        "full_name": "นางสาวปิญชาน อุดมโภชน์",
+        "branch_id": "HCI",
+        "position": "ฝ่ายเลขานุการ"
+    },
+    {
+        "student_id": "69204",
+        "full_name": "นายคิมภกรณ์ ไชยขันธุ์",
+        "branch_id": "HCI",
+        "position": "ฝ่ายโสต"
+    },
+    {
+        "student_id": "69205",
+        "full_name": "นางสาวกุลนิษฐ์ ประดิษฐ์ธรรม",
+        "branch_id": "HCI",
+        "position": "ฝ่ายเฮดวิชาการ"
+    },
+    {
+        "student_id": "69206",
+        "full_name": "นางสาวอนัญญา ปานหงษ์",
+        "branch_id": "HCI",
+        "position": "ฝ่ายประสานงาน"
+    },
+    {
+        "student_id": "69207",
+        "full_name": "นางสาวปาลิดา โลกาวัฒนะ",
+        "branch_id": "HCI",
+        "position": "ฝ่ายเฮดฝ่ายทะเบียน"
+    },
+    {
+        "student_id": "69208",
+        "full_name": "นางสาวแวตัสนีม แวหะมุ",
+        "branch_id": "HCI",
+        "position": "ฝ่ายสวัสดิการ"
+    },
+    {
+        "student_id": "69209",
+        "full_name": "นางสาวพัทรวรรณ คำภิโล",
+        "branch_id": "HCI",
+        "position": "ฝ่ายกีฬา"
+    },
+    {
+        "student_id": "69210",
+        "full_name": "นายอนุชา รักบูรณ์",
+        "branch_id": "HCI",
+        "position": "ฝ่ายเหรัญญิก"
+    },
+    {
+        "student_id": "69301",
+        "full_name": "นายธนโชติ พันธุ์ลำเจียก",
+        "branch_id": "EMT",
+        "position": "ฝ่ายอุปนายก"
+    },
+    {
+        "student_id": "69302",
+        "full_name": "นายแทนไท พรมชาติ",
+        "branch_id": "EMT",
+        "position": "ฝ่ายเลขานุการ"
+    },
+    {
+        "student_id": "69303",
+        "full_name": "นางสาวจิรภา แดงสังวาลย์",
+        "branch_id": "EMT",
+        "position": "ฝ่ายเหรัญญิก"
+    },
+    {
+        "student_id": "69304",
+        "full_name": "นางสาวสุภัสสรา ธรรมจิตติ",
+        "branch_id": "EMT",
+        "position": "ฝ่ายวิชาการ"
+    },
+    {
+        "student_id": "69305",
+        "full_name": "นางสาวธนพร ตรีโอษฐ์",
+        "branch_id": "EMT",
+        "position": "ฝ่ายประสานงาน"
+    },
+    {
+        "student_id": "69306",
+        "full_name": "นางสาวณัฐนิชา ครุฑวิชิต",
+        "branch_id": "EMT",
+        "position": "ฝ่ายประชาสัมพันธ์ (เฮด)"
+    },
+    {
+        "student_id": "69307",
+        "full_name": "นางสาวณัฐกมล สีชมภู",
+        "branch_id": "EMT",
+        "position": "ฝ่านอาคารและสถานที่"
+    },
+    {
+        "student_id": "69308",
+        "full_name": "นางสาวธันณธรณ์ จวงจันทร์",
+        "branch_id": "EMT",
+        "position": "ฝ่ายกีฬา (เฮด)"
+    },
+    {
+        "student_id": "69309",
+        "full_name": "นางสาวสุพาณี ผมเหมาะ",
+        "branch_id": "EMT",
+        "position": "ฝ่ายสวัสดิการ"
+    },
+    {
+        "student_id": "69310",
+        "full_name": "นายณัฐเศรษฐ ใจสุข",
+        "branch_id": "EMT",
+        "position": "ฝ่ายโสต (เฮด)"
+    },
+    {
+        "student_id": "69311",
+        "full_name": "นางสาวหทัยรัตน์ ชูรักษ์",
+        "branch_id": "EMT",
+        "position": "ฝ่ายประสานงาน"
+    },
+    {
+        "student_id": "69401",
+        "full_name": "นางสาวชนันภรณ์ เผือกผุด",
+        "branch_id": "MR_BSC",
+        "position": "อุปนายก"
+    },
+    {
+        "student_id": "69402",
+        "full_name": "ลาภวัต มหาวงศ์",
+        "branch_id": "MR_BSC",
+        "position": "ฝ่ายเลขานุการ"
+    },
+    {
+        "student_id": "69403",
+        "full_name": "นางสาวฤทัยชนก วัตนานุสิทธิ์",
+        "branch_id": "MR_BSC",
+        "position": "ฝ่ายกิจกรรม"
+    },
+    {
+        "student_id": "69404",
+        "full_name": "นางสาวศิริยาพร บุญมี",
+        "branch_id": "MR_BSC",
+        "position": "ฝ่ายประสานงาน"
+    },
+    {
+        "student_id": "69405",
+        "full_name": "นางสาวเกวลิน ฤาชา",
+        "branch_id": "MR_BSC",
+        "position": "ฝ่ายเหรัญญิก (เฮด)"
+    },
+    {
+        "student_id": "69406",
+        "full_name": "นางสาวบุษรากร ชูคันหอม",
+        "branch_id": "MR_BSC",
+        "position": "ฝ่ายสวัสดิการ"
+    },
+    {
+        "student_id": "69407",
+        "full_name": "นางสาวณัฐฐา ตราโต",
+        "branch_id": "MR_BSC",
+        "position": "ฝ่ายสวัสดิการ"
+    },
+    {
+        "student_id": "69408",
+        "full_name": "นางสาวชุติกาญจน์ ละกะเต็บ",
+        "branch_id": "MR_BSC",
+        "position": "ฝ่ายวิชาการ"
+    },
+    {
+        "student_id": "69409",
+        "full_name": "นายพิทักษ์พงศ์ สาหินกอง",
+        "branch_id": "MR_BSC",
+        "position": "ฝ่ายประชาสัมพันธ์"
+    },
+    {
+        "student_id": "69410",
+        "full_name": "นายคุณากร ชุมพล",
+        "branch_id": "MR_BSC",
+        "position": "ฝ่ายโสต"
+    },
+    {
+        "student_id": "69411",
+        "full_name": "นายธนพันธุ์ จะปะการ",
+        "branch_id": "MR_BSC",
+        "position": "ฝ่ายโสต"
+    },
+    {
+        "student_id": "69501",
+        "full_name": "นายกรวิชญ์ เวฬุวนารักษ์",
+        "branch_id": "TTM",
+        "position": "อุปนายก"
+    },
+    {
+        "student_id": "69502",
+        "full_name": "นายมหรรณพ มัฆมาน",
+        "branch_id": "TTM",
+        "position": "ฝ่ายเลขานุการ"
+    },
+    {
+        "student_id": "69503",
+        "full_name": "นางสาวศุภิสรา สุขสมบูรณ์",
+        "branch_id": "TTM",
+        "position": "ฝ่ายพหุวัฒนธรรม (เฮด)"
+    },
+    {
+        "student_id": "69504",
+        "full_name": "นางสาวอินทุอร พึ่งบุญ ณ อยุธยา",
+        "branch_id": "TTM",
+        "position": "ฝ่ายสวัสดิการ"
+    },
+    {
+        "student_id": "69505",
+        "full_name": "นางสาวอาลียา กาซอ",
+        "branch_id": "TTM",
+        "position": "ฝ่ายกิจกรรม"
+    },
+    {
+        "student_id": "69506",
+        "full_name": "นางสาวบุษย์ ช่วยเกิด",
+        "branch_id": "TTM",
+        "position": "ฝ่ายเหรัญญิก"
+    },
+    {
+        "student_id": "69507",
+        "full_name": "นายพงศ์ดนัย ราษดี",
+        "branch_id": "TTM",
+        "position": "ฝ่ายประชาสัมพันธ์"
+    },
+    {
+        "student_id": "69508",
+        "full_name": "นายตุลวัฒน์ สุวรรณวงศ์",
+        "branch_id": "TTM",
+        "position": "ฝ่ายวิชาการ"
+    },
+    {
+        "student_id": "69509",
+        "full_name": "นางสาวสุภารัตน์ คงมั่น",
+        "branch_id": "TTM",
+        "position": "ฝ่ายพหุวัฒนธรรม"
+    },
+    {
+        "student_id": "69510",
+        "full_name": "นายยศกร สุภัคจารุสิทธิ์",
+        "branch_id": "TTM",
+        "position": "ฝ่ายประสานงาน"
+    },
+    {
+        "student_id": "69601",
+        "full_name": "นางสาวจุฑามาศ องอาจ",
+        "branch_id": "MR_DIP",
+        "position": "อุปนายก"
+    },
+    {
+        "student_id": "69602",
+        "full_name": "นางสาวภาณุมาศ บุญนวน",
+        "branch_id": "MR_DIP",
+        "position": "สันทนาการ"
+    }
+],
   sessions: [
     {
       session_id: 'SESS-20260901-01',
@@ -53,46 +386,33 @@ const INITIAL_MOCK_DATA = {
       created_at: '2026-09-17 17:00:00'
     }
   ],
-  attendance: [
-    // Session 1
-    { session_id: 'SESS-20260901-01', student_id: '6911001', status: 'มา', checked_by: 'admin01', timestamp: '2026-09-01 09:05:00' },
-    { session_id: 'SESS-20260901-01', student_id: '6911002', status: 'มา', checked_by: 'admin01', timestamp: '2026-09-01 09:05:00' },
-    { session_id: 'SESS-20260901-01', student_id: '6911003', status: 'สาย', checked_by: 'admin01', timestamp: '2026-09-01 09:15:00' },
-    { session_id: 'SESS-20260901-01', student_id: '6911004', status: 'ลา', checked_by: 'admin01', timestamp: '2026-09-01 09:00:00' },
-    { session_id: 'SESS-20260901-01', student_id: '6912001', status: 'มา', checked_by: 'admin01', timestamp: '2026-09-01 09:05:00' },
-    { session_id: 'SESS-20260901-01', student_id: '6912002', status: 'ขาด', checked_by: 'admin01', timestamp: '2026-09-01 09:30:00' },
-    { session_id: 'SESS-20260901-01', student_id: '6912003', status: 'มา', checked_by: 'admin01', timestamp: '2026-09-01 09:05:00' },
-    { session_id: 'SESS-20260901-01', student_id: '6912004', status: 'มา', checked_by: 'admin01', timestamp: '2026-09-01 09:05:00' },
-    { session_id: 'SESS-20260901-01', student_id: '6913001', status: 'มา', checked_by: 'admin01', timestamp: '2026-09-01 09:05:00' },
-    { session_id: 'SESS-20260901-01', student_id: '6913002', status: 'สาย', checked_by: 'admin01', timestamp: '2026-09-01 09:12:00' },
-    { session_id: 'SESS-20260901-01', student_id: '6913003', status: 'มา', checked_by: 'admin01', timestamp: '2026-09-01 09:05:00' },
-    { session_id: 'SESS-20260901-01', student_id: '6913004', status: 'มา', checked_by: 'admin01', timestamp: '2026-09-01 09:05:00' },
-
-    // Session 2
-    { session_id: 'SESS-20260910-02', student_id: '6911001', status: 'มา', checked_by: 'admin01', timestamp: '2026-09-10 13:35:00' },
-    { session_id: 'SESS-20260910-02', student_id: '6911002', status: 'มา', checked_by: 'admin01', timestamp: '2026-09-10 13:35:00' },
-    { session_id: 'SESS-20260910-02', student_id: '6911003', status: 'มา', checked_by: 'admin01', timestamp: '2026-09-10 13:35:00' },
-    { session_id: 'SESS-20260910-02', student_id: '6911004', status: 'มา', checked_by: 'admin01', timestamp: '2026-09-10 13:35:00' },
-    { session_id: 'SESS-20260910-02', student_id: '6912001', status: 'สาย', checked_by: 'admin01', timestamp: '2026-09-10 13:45:00' },
-    { session_id: 'SESS-20260910-02', student_id: '6912002', status: 'ขาด', checked_by: 'admin01', timestamp: '2026-09-10 14:00:00' },
-    { session_id: 'SESS-20260910-02', student_id: '6912003', status: 'มา', checked_by: 'admin01', timestamp: '2026-09-10 13:35:00' },
-    { session_id: 'SESS-20260910-02', student_id: '6912004', status: 'ลา', checked_by: 'admin01', timestamp: '2026-09-10 13:30:00' },
-    { session_id: 'SESS-20260910-02', student_id: '6913001', status: 'มา', checked_by: 'admin01', timestamp: '2026-09-10 13:35:00' },
-    { session_id: 'SESS-20260910-02', student_id: '6913002', status: 'มา', checked_by: 'admin01', timestamp: '2026-09-10 13:35:00' },
-    { session_id: 'SESS-20260910-02', student_id: '6913003', status: 'ขาด', checked_by: 'admin01', timestamp: '2026-09-10 14:00:00' },
-    { session_id: 'SESS-20260910-02', student_id: '6913004', status: 'มา', checked_by: 'admin01', timestamp: '2026-09-10 13:35:00' },
-
-    // Session 3 (Draft)
-    { session_id: 'SESS-20260917-03', student_id: '6911001', status: 'มา', checked_by: 'admin01', timestamp: '2026-09-17 17:05:00' },
-    { session_id: 'SESS-20260917-03', student_id: '6911002', status: 'มา', checked_by: 'admin01', timestamp: '2026-09-17 17:05:00' },
-    { session_id: 'SESS-20260917-03', student_id: '6911003', status: 'สาย', checked_by: 'admin01', timestamp: '2026-09-17 17:15:00' },
-    { session_id: 'SESS-20260917-03', student_id: '6912001', status: 'มา', checked_by: 'admin01', timestamp: '2026-09-17 17:05:00' }
-  ],
+  attendance: [],
   admins: [
     { admin_id: 'admin01', pin: '1234', role: 'admin', name: 'แอดมินสโมสร' },
     { admin_id: 'checker01', pin: '1234', role: 'checker', name: 'ผู้เช็คชื่อประจำวัน' }
   ]
 };
+
+// จำลองการเช็คชื่อสำหรับ 53 คนใน 2 session แรก
+const s1_statuses = ['มา', 'มา', 'มา', 'สาย', 'มา', 'มา', 'ลา', 'มา', 'ขาด', 'มา'];
+const s2_statuses = ['มา', 'สาย', 'มา', 'มา', 'มา', 'ขาด', 'มา', 'ลา', 'มา', 'มา'];
+
+students.forEach((st, idx) => {
+  INITIAL_MOCK_DATA.attendance.push({
+    session_id: 'SESS-20260901-01',
+    student_id: st.student_id,
+    status: s1_statuses[idx % s1_statuses.length],
+    checked_by: 'admin01',
+    timestamp: '2026-09-01 09:05:00'
+  });
+  INITIAL_MOCK_DATA.attendance.push({
+    session_id: 'SESS-20260910-02',
+    student_id: st.student_id,
+    status: s2_statuses[idx % s2_statuses.length],
+    checked_by: 'admin01',
+    timestamp: '2026-09-10 13:35:00'
+  });
+});
 
 const MockDB = {
   get() {
@@ -249,6 +569,7 @@ const MockDB = {
         student_id: st.student_id,
         full_name: st.full_name,
         branch_id: st.branch_id,
+        position: st.position || '',
         present: p,
         late: l,
         excused: e,

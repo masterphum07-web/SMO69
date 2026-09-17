@@ -291,6 +291,7 @@ const Attendance = {
             <span class="branch-badge" style="background-color: ${branch.color_hex}20; color: ${branch.color_hex}; border-color: ${branch.color_hex}50">
               ${branch.branch_name}
             </span>
+            ${st.position ? `<span class="position-badge">${st.position}</span>` : ''}
           </div>
         </td>
         <td class="col-status-badge text-center">

@@ -32,39 +32,87 @@ function setSheet(sheetName) {
 
 /**
  * ฟังก์ชันสร้างฐานข้อมูลและตารางเริ่มต้นอัตโนมัติ (รันครั้งเดียวใน Apps Script)
+ * บรรจุรายชื่อสโมสรนักศึกษาปี 2569 ครบทั้ง 6 สาขาวิชา รวม 53 คน
  */
 function setupInitialDatabase() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  // 1. ชีต Branches
+  // 1. ชีต Branches (6 สาขาวิชา)
   const bSheet = setSheet(SHEETS.BRANCHES);
   if (bSheet.getLastRow() === 0) {
     bSheet.appendRow(['branch_id', 'branch_name', 'color_hex']);
-    bSheet.appendRow(['RT01', 'รังสีเทคนิค', '#2563EB']);
-    bSheet.appendRow(['PH01', 'สาธารณสุขชุมชน', '#10B981']);
-    bSheet.appendRow(['DT01', 'ทันตสาธารณสุข', '#F59E0B']);
+    const branchList = [
+    ['RT', 'รังสีเทคนิค', '#2563EB'],
+    ['HCI', 'นวัตกรรมสื่อสารสุขภาพ', '#8B5CF6'],
+    ['EMT', 'ฉุกเฉินการแพทย์', '#EF4444'],
+    ['MR_BSC', 'วท.บ.เวชระเบียน', '#06B6D4'],
+    ['TTM', 'การแพทย์แผนไทย', '#10B981'],
+    ['MR_DIP', 'ปวส.เวชระเบียน', '#F59E0B']
+    ];
+    branchList.forEach(row => bSheet.appendRow(row));
     formatHeaderRow(bSheet, '#1E3A8A');
   }
 
-  // 2. ชีต Students
+  // 2. ชีต Students (53 คน)
   const sSheet = setSheet(SHEETS.STUDENTS);
   if (sSheet.getLastRow() === 0) {
-    sSheet.appendRow(['student_id', 'full_name', 'branch_id']);
-    const mockStudents = [
-      ['6911001', 'กิตติศักดิ์ เจริญผล', 'RT01'],
-      ['6911002', 'จิราพร วงศ์สวัสดิ์', 'RT01'],
-      ['6911003', 'ชานนท์ สิทธิพงศ์', 'RT01'],
-      ['6911004', 'ณัฐวุฒิ บุญมี', 'RT01'],
-      ['6912001', 'ธนากร ภักดีชน', 'PH01'],
-      ['6912002', 'เบญจมาศ ศรีสุข', 'PH01'],
-      ['6912003', 'ปิยะวัฒน์ ทองหล่อ', 'PH01'],
-      ['6912004', 'พิมลดา สุวรรณโชติ', 'PH01'],
-      ['6913001', 'วรินทร ดำรงเกียรติ', 'DT01'],
-      ['6913002', 'ศิริพร บุญรักษา', 'DT01'],
-      ['6913003', 'อนันดา พงษ์ศิริ', 'DT01'],
-      ['6913004', 'อาริยา สมบูรณ์', 'DT01']
+    sSheet.appendRow(['student_id', 'full_name', 'branch_id', 'position']);
+    const realStudents = [
+    ['69101', 'นางสาวภัทรวรินทร์ เกษมสุข', 'RT', 'นายก'],
+    ['69102', 'นางสาวประภัสสร วงษ์กำภู', 'RT', 'ฝ่ายเลขานุการ (เฮด)'],
+    ['69103', 'นายบดินทร์ การุณเวทย์', 'RT', 'ฝ่ายเหรัญญิก'],
+    ['69104', 'นายภูมิภัทร สว่างเวียง', 'RT', 'ฝ่ายวิชาการ'],
+    ['69105', 'นางสาวดอกรัก อิสระอังกูร', 'RT', 'ฝ่ายประสานงาน (เฮด)'],
+    ['69106', 'นางสาวอัญญานี อาสะหนิ', 'RT', 'ฝ่ายประชาสัมพันธ์'],
+    ['69107', 'นางสาวพิมพ์พันธุ์ กล่องทอง', 'RT', 'ฝ่ายกิจกรรม (เฮด)'],
+    ['69108', 'นายศรัณย์ อินทรีย์', 'RT', 'ฝ่ายโสต'],
+    ['69109', 'นางสาวจินตนา ศรีเริ่มสกุล', 'RT', 'ฝ่ายสถานที่ (เฮด)'],
+    ['69201', 'นางสาวจุฑามณี สมบัติ', 'HCI', 'อุปนายก'],
+    ['69202', 'นางสาวณัจมีย์ ปูเตะ', 'HCI', 'ฝ่ายประชาสัมพันธ์'],
+    ['69203', 'นางสาวปิญชาน อุดมโภชน์', 'HCI', 'ฝ่ายเลขานุการ'],
+    ['69204', 'นายคิมภกรณ์ ไชยขันธุ์', 'HCI', 'ฝ่ายโสต'],
+    ['69205', 'นางสาวกุลนิษฐ์ ประดิษฐ์ธรรม', 'HCI', 'ฝ่ายเฮดวิชาการ'],
+    ['69206', 'นางสาวอนัญญา ปานหงษ์', 'HCI', 'ฝ่ายประสานงาน'],
+    ['69207', 'นางสาวปาลิดา โลกาวัฒนะ', 'HCI', 'ฝ่ายเฮดฝ่ายทะเบียน'],
+    ['69208', 'นางสาวแวตัสนีม แวหะมุ', 'HCI', 'ฝ่ายสวัสดิการ'],
+    ['69209', 'นางสาวพัทรวรรณ คำภิโล', 'HCI', 'ฝ่ายกีฬา'],
+    ['69210', 'นายอนุชา รักบูรณ์', 'HCI', 'ฝ่ายเหรัญญิก'],
+    ['69301', 'นายธนโชติ พันธุ์ลำเจียก', 'EMT', 'ฝ่ายอุปนายก'],
+    ['69302', 'นายแทนไท พรมชาติ', 'EMT', 'ฝ่ายเลขานุการ'],
+    ['69303', 'นางสาวจิรภา แดงสังวาลย์', 'EMT', 'ฝ่ายเหรัญญิก'],
+    ['69304', 'นางสาวสุภัสสรา ธรรมจิตติ', 'EMT', 'ฝ่ายวิชาการ'],
+    ['69305', 'นางสาวธนพร ตรีโอษฐ์', 'EMT', 'ฝ่ายประสานงาน'],
+    ['69306', 'นางสาวณัฐนิชา ครุฑวิชิต', 'EMT', 'ฝ่ายประชาสัมพันธ์ (เฮด)'],
+    ['69307', 'นางสาวณัฐกมล สีชมภู', 'EMT', 'ฝ่านอาคารและสถานที่'],
+    ['69308', 'นางสาวธันณธรณ์ จวงจันทร์', 'EMT', 'ฝ่ายกีฬา (เฮด)'],
+    ['69309', 'นางสาวสุพาณี ผมเหมาะ', 'EMT', 'ฝ่ายสวัสดิการ'],
+    ['69310', 'นายณัฐเศรษฐ ใจสุข', 'EMT', 'ฝ่ายโสต (เฮด)'],
+    ['69311', 'นางสาวหทัยรัตน์ ชูรักษ์', 'EMT', 'ฝ่ายประสานงาน'],
+    ['69401', 'นางสาวชนันภรณ์ เผือกผุด', 'MR_BSC', 'อุปนายก'],
+    ['69402', 'ลาภวัต มหาวงศ์', 'MR_BSC', 'ฝ่ายเลขานุการ'],
+    ['69403', 'นางสาวฤทัยชนก วัตนานุสิทธิ์', 'MR_BSC', 'ฝ่ายกิจกรรม'],
+    ['69404', 'นางสาวศิริยาพร บุญมี', 'MR_BSC', 'ฝ่ายประสานงาน'],
+    ['69405', 'นางสาวเกวลิน ฤาชา', 'MR_BSC', 'ฝ่ายเหรัญญิก (เฮด)'],
+    ['69406', 'นางสาวบุษรากร ชูคันหอม', 'MR_BSC', 'ฝ่ายสวัสดิการ'],
+    ['69407', 'นางสาวณัฐฐา ตราโต', 'MR_BSC', 'ฝ่ายสวัสดิการ'],
+    ['69408', 'นางสาวชุติกาญจน์ ละกะเต็บ', 'MR_BSC', 'ฝ่ายวิชาการ'],
+    ['69409', 'นายพิทักษ์พงศ์ สาหินกอง', 'MR_BSC', 'ฝ่ายประชาสัมพันธ์'],
+    ['69410', 'นายคุณากร ชุมพล', 'MR_BSC', 'ฝ่ายโสต'],
+    ['69411', 'นายธนพันธุ์ จะปะการ', 'MR_BSC', 'ฝ่ายโสต'],
+    ['69501', 'นายกรวิชญ์ เวฬุวนารักษ์', 'TTM', 'อุปนายก'],
+    ['69502', 'นายมหรรณพ มัฆมาน', 'TTM', 'ฝ่ายเลขานุการ'],
+    ['69503', 'นางสาวศุภิสรา สุขสมบูรณ์', 'TTM', 'ฝ่ายพหุวัฒนธรรม (เฮด)'],
+    ['69504', 'นางสาวอินทุอร พึ่งบุญ ณ อยุธยา', 'TTM', 'ฝ่ายสวัสดิการ'],
+    ['69505', 'นางสาวอาลียา กาซอ', 'TTM', 'ฝ่ายกิจกรรม'],
+    ['69506', 'นางสาวบุษย์ ช่วยเกิด', 'TTM', 'ฝ่ายเหรัญญิก'],
+    ['69507', 'นายพงศ์ดนัย ราษดี', 'TTM', 'ฝ่ายประชาสัมพันธ์'],
+    ['69508', 'นายตุลวัฒน์ สุวรรณวงศ์', 'TTM', 'ฝ่ายวิชาการ'],
+    ['69509', 'นางสาวสุภารัตน์ คงมั่น', 'TTM', 'ฝ่ายพหุวัฒนธรรม'],
+    ['69510', 'นายยศกร สุภัคจารุสิทธิ์', 'TTM', 'ฝ่ายประสานงาน'],
+    ['69601', 'นางสาวจุฑามาศ องอาจ', 'MR_DIP', 'อุปนายก'],
+    ['69602', 'นางสาวภาณุมาศ บุญนวน', 'MR_DIP', 'สันทนาการ']
     ];
-    mockStudents.forEach(row => sSheet.appendRow(row));
+    realStudents.forEach(row => sSheet.appendRow(row));
     formatHeaderRow(sSheet, '#1E3A8A');
   }
 
@@ -82,21 +130,11 @@ function setupInitialDatabase() {
   if (attSheet.getLastRow() === 0) {
     attSheet.appendRow(['session_id', 'student_id', 'status', 'checked_by', 'timestamp']);
     const nowStr = Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyy-MM-dd HH:mm:ss');
-    const mockAtt = [
-      ['SESS-20260901-01', '6911001', 'มา', 'admin01', nowStr],
-      ['SESS-20260901-01', '6911002', 'มา', 'admin01', nowStr],
-      ['SESS-20260901-01', '6911003', 'สาย', 'admin01', nowStr],
-      ['SESS-20260901-01', '6911004', 'ลา', 'admin01', nowStr],
-      ['SESS-20260901-01', '6912001', 'มา', 'admin01', nowStr],
-      ['SESS-20260901-01', '6912002', 'ขาด', 'admin01', nowStr],
-      ['SESS-20260901-01', '6912003', 'มา', 'admin01', nowStr],
-      ['SESS-20260901-01', '6912004', 'มา', 'admin01', nowStr],
-      ['SESS-20260901-01', '6913001', 'มา', 'admin01', nowStr],
-      ['SESS-20260901-01', '6913002', 'สาย', 'admin01', nowStr],
-      ['SESS-20260901-01', '6913003', 'มา', 'admin01', nowStr],
-      ['SESS-20260901-01', '6913004', 'มา', 'admin01', nowStr]
-    ];
-    mockAtt.forEach(row => attSheet.appendRow(row));
+    // เช็คชื่อเริ่มต้น
+    const sampleStudents = ['69101', '69102', '69201', '69301', '69401', '69501', '69601'];
+    sampleStudents.forEach(id => {
+      attSheet.appendRow(['SESS-20260901-01', id, 'มา', 'admin01', nowStr]);
+    });
     formatHeaderRow(attSheet, '#1E3A8A');
   }
 
@@ -105,7 +143,7 @@ function setupInitialDatabase() {
   if (admSheet.getLastRow() === 0) {
     admSheet.appendRow(['admin_id', 'pin', 'role', 'name']);
     admSheet.appendRow(['admin01', '1234', 'admin', 'แอดมินสโมสร']);
-    admSheet.appendRow(['checker01', '1234', 'checker', 'ผู้เช็คชื่อ 1']);
+    admSheet.appendRow(['checker01', '1234', 'checker', 'ผู้เช็คชื่อประจำวัน']);
     formatHeaderRow(admSheet, '#1E3A8A');
   }
 
@@ -116,6 +154,7 @@ function setupInitialDatabase() {
       'student_id',
       'full_name',
       'branch_id',
+      'position',
       'present_count',
       'late_count',
       'excused_count',
@@ -129,7 +168,7 @@ function setupInitialDatabase() {
   // อัปเดต Summary รอบแรก
   updateDashboardSummary();
 
-  Logger.log('Setup Initial Database Completed Successfully!');
+  Logger.log('Setup Initial Database Completed Successfully with 53 students!');
 }
 
 function formatHeaderRow(sheet, bgColor) {
@@ -180,7 +219,6 @@ function doGet(e) {
         break;
 
       case 'getInitialData':
-        // ดึงข้อมูลภาพรวมในครั้งเดียวเพื่อลด latency
         result = {
           success: true,
           data: {
@@ -251,9 +289,6 @@ function doPost(e) {
   }
 }
 
-/**
- * Helper จัดรูป JSON Response รองรับ JSONP (ถ้ามี callback)
- */
 function createJsonResponse(data, e) {
   const jsonString = JSON.stringify(data);
   const callback = (e && e.parameter && e.parameter.callback) ? e.parameter.callback : null;
@@ -344,7 +379,8 @@ function getStudentsData(branchFilter) {
       const student = {
         student_id: String(row[0]).trim(),
         full_name: String(row[1]).trim(),
-        branch_id: String(row[2]).trim()
+        branch_id: String(row[2]).trim(),
+        position: row[3] ? String(row[3]).trim() : ''
       };
       if (!branchFilter || branchFilter === 'ALL' || student.branch_id === branchFilter) {
         students.push(student);
@@ -374,7 +410,6 @@ function getSessionsData() {
       });
     }
   }
-  // เรียงลำดับจากล่าสุดไปเก่าสุด
   return sessions.reverse();
 }
 
@@ -405,10 +440,6 @@ function getSessionAttendanceData(sessionId) {
  * Core Business Logic
  * =========================================================================
  */
-
-/**
- * สร้าง Session องค์ประชุมใหม่
- */
 function createSession(title, date, branchScope, adminId) {
   if (!title || !date) {
     return { success: false, error: 'กรุณากรอกชื่อหัวข้อและวันที่' };
@@ -438,12 +469,6 @@ function createSession(title, date, branchScope, adminId) {
   };
 }
 
-/**
- * บันทึกร่างการเช็คชื่อทีละคน/หลายคน (Save Draft เรียลไทม์)
- * @param {string} sessionId
- * @param {Array<{student_id: string, status: string}>} records
- * @param {string} adminId
- */
 function saveAttendanceDraft(sessionId, records, adminId) {
   if (!sessionId || !records || !Array.isArray(records)) {
     return { success: false, error: 'ข้อมูลสำหรับบันทึกไม่ถูกต้อง' };
@@ -458,13 +483,12 @@ function saveAttendanceDraft(sessionId, records, adminId) {
     const nowStr = Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyy-MM-dd HH:mm:ss');
     const checker = adminId || 'admin';
 
-    // สร้าง Map index ของข้อมูลเดิมตาม key: sessionId + '_' + studentId
     const existingRowMap = {};
     for (let i = 1; i < data.length; i++) {
       const row = data[i];
       if (String(row[0]).trim() === String(sessionId).trim()) {
         const studentId = String(row[1]).trim();
-        existingRowMap[studentId] = i + 1; // 1-based row index
+        existingRowMap[studentId] = i + 1;
       }
     }
 
@@ -476,11 +500,9 @@ function saveAttendanceDraft(sessionId, records, adminId) {
       if (!studentId || !status) return;
 
       if (existingRowMap[studentId]) {
-        // อัปเดตแถวเดิม
         const rowNum = existingRowMap[studentId];
         sheet.getRange(rowNum, 3, 1, 3).setValues([[status, checker, nowStr]]);
       } else {
-        // แถวใหม่รอ append
         rowsToAppend.push([sessionId, studentId, status, checker, nowStr]);
       }
     });
@@ -499,10 +521,6 @@ function saveAttendanceDraft(sessionId, records, adminId) {
   }
 }
 
-/**
- * ยืนยันส่งผลการเช็คชื่อ (Submit Attendance)
- * เปลี่ยนสถานะ session เป็น 'submitted' และคำนวณ Dashboard_Summary ใหม่
- */
 function submitAttendance(sessionId, adminId) {
   if (!sessionId) {
     return { success: false, error: 'ไม่พบ Session ID' };
@@ -527,11 +545,9 @@ function submitAttendance(sessionId, adminId) {
       return { success: false, error: 'ไม่พบข้อมูลองค์ประชุมนี้ในระบบ' };
     }
 
-    // อัปเดตสถานะเป็น submitted
     sessSheet.getRange(foundRow, 5).setValue('submitted');
     SpreadsheetApp.flush();
 
-    // คำนวณ Dashboard Summary
     updateDashboardSummary();
 
     return { success: true, message: 'ยืนยันและปิดรอบการเช็คชื่อเรียบร้อยแล้ว' };
@@ -542,9 +558,6 @@ function submitAttendance(sessionId, adminId) {
   }
 }
 
-/**
- * คำนวณสรุปรายบุคคลลงในชีต Dashboard_Summary
- */
 function updateDashboardSummary() {
   const students = getStudentsData();
   const attSheet = setSheet(SHEETS.ATTENDANCE);
@@ -553,7 +566,6 @@ function updateDashboardSummary() {
   const attData = attSheet.getDataRange().getValues();
   const sessData = sessSheet.getDataRange().getValues();
 
-  // นับเฉพาะ sessions ที่มีสถานะ submitted (หรือทั้งหมดที่มีการเช็ค)
   const validSessionIds = new Set();
   for (let i = 1; i < sessData.length; i++) {
     if (sessData[i][0] && sessData[i][4] === 'submitted') {
@@ -561,13 +573,13 @@ function updateDashboardSummary() {
     }
   }
 
-  // สร้าง Map สถิติต่อคน
   const statsMap = {};
   students.forEach(st => {
     statsMap[st.student_id] = {
       student_id: st.student_id,
       full_name: st.full_name,
       branch_id: st.branch_id,
+      position: st.position || '',
       present: 0,
       late: 0,
       excused: 0,
@@ -582,7 +594,6 @@ function updateDashboardSummary() {
     const stId = String(row[1]).trim();
     const status = String(row[2]).trim();
 
-    // นับสถิติเมื่อตรงกับ student ในระบบ
     if (statsMap[stId]) {
       statsMap[stId].total++;
       if (status === 'มา') statsMap[stId].present++;
@@ -592,21 +603,20 @@ function updateDashboardSummary() {
     }
   }
 
-  // เขียนทับลงในชีต Dashboard_Summary
   const dashSheet = setSheet(SHEETS.DASHBOARD_SUMMARY);
   const rows = [];
 
   students.forEach(st => {
     const s = statsMap[st.student_id];
-    // อัตราการเข้าร่วม = (มา + สาย) / total * 100
     const totalCount = s.present + s.late + s.excused + s.absent;
-    const attendedCount = s.present + (s.late * 0.75); // สายให้น้ำหนัก 75%
+    const attendedCount = s.present + (s.late * 0.75);
     const rate = totalCount > 0 ? ((attendedCount / totalCount) * 100).toFixed(1) + '%' : '0%';
 
     rows.push([
       s.student_id,
       s.full_name,
       s.branch_id,
+      s.position,
       s.present,
       s.late,
       s.excused,
@@ -616,21 +626,17 @@ function updateDashboardSummary() {
     ]);
   });
 
-  // ล้างข้อมูลเดิมแถวที่ 2 เป็นต้นไป
   if (dashSheet.getLastRow() > 1) {
     dashSheet.getRange(2, 1, dashSheet.getLastRow() - 1, dashSheet.getLastColumn()).clearContent();
   }
 
   if (rows.length > 0) {
-    dashSheet.getRange(2, 1, rows.length, 9).setValues(rows);
+    dashSheet.getRange(2, 1, rows.length, 10).setValues(rows);
   }
 
   SpreadsheetApp.flush();
 }
 
-/**
- * ดึงข้อมูล Leaderboard (สรุปทั้งเทอม ไม่ต้อง Login)
- */
 function getLeaderboard() {
   const dashSheet = setSheet(SHEETS.DASHBOARD_SUMMARY);
   const data = dashSheet.getDataRange().getValues();
@@ -647,19 +653,18 @@ function getLeaderboard() {
         student_id: String(row[0]).trim(),
         full_name: String(row[1]).trim(),
         branch_id: String(row[2]).trim(),
-        present: Number(row[3]) || 0,
-        late: Number(row[4]) || 0,
-        excused: Number(row[5]) || 0,
-        absent: Number(row[6]) || 0,
-        total: Number(row[7]) || 0,
-        rate: String(row[8] || '0%')
+        position: String(row[3] || '').trim(),
+        present: Number(row[4]) || 0,
+        late: Number(row[5]) || 0,
+        excused: Number(row[6]) || 0,
+        absent: Number(row[7]) || 0,
+        total: Number(row[8]) || 0,
+        rate: String(row[9] || '0%')
       });
     }
   }
 
-  // เรียงคนที่เข้าร่วมมากที่สุด
   const topPresent = [...students].sort((a, b) => (b.present + b.late) - (a.present + a.late)).slice(0, 5);
-  // เรียงคนที่ขาดมากที่สุด
   const topAbsent = [...students].sort((a, b) => b.absent - a.absent).slice(0, 5);
 
   return {
@@ -669,9 +674,6 @@ function getLeaderboard() {
   };
 }
 
-/**
- * ดึงข้อมูล Dashboard เต็มสำหรับแอดมิน (Filter สาขาได้)
- */
 function getDashboard(filterBranch) {
   const dashSheet = setSheet(SHEETS.DASHBOARD_SUMMARY);
   const data = dashSheet.getDataRange().getValues();
@@ -691,10 +693,10 @@ function getDashboard(filterBranch) {
     if (row[0]) {
       const branchId = String(row[2]).trim();
       if (!filterBranch || filterBranch === 'ALL' || branchId === filterBranch) {
-        const p = Number(row[3]) || 0;
-        const l = Number(row[4]) || 0;
-        const e = Number(row[5]) || 0;
-        const a = Number(row[6]) || 0;
+        const p = Number(row[4]) || 0;
+        const l = Number(row[5]) || 0;
+        const e = Number(row[6]) || 0;
+        const a = Number(row[7]) || 0;
         totalPresent += p;
         totalLate += l;
         totalExcused += e;
@@ -704,12 +706,13 @@ function getDashboard(filterBranch) {
           student_id: String(row[0]).trim(),
           full_name: String(row[1]).trim(),
           branch_id: branchId,
+          position: String(row[3] || '').trim(),
           present: p,
           late: l,
           excused: e,
           absent: a,
-          total: Number(row[7]) || 0,
-          rate: String(row[8] || '0%')
+          total: Number(row[8]) || 0,
+          rate: String(row[9] || '0%')
         });
       }
     }
