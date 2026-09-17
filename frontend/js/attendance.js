@@ -104,6 +104,11 @@ const Attendance = {
 
   updateSessionNotice() {
     const el = document.getElementById('attendance-session-notice');
+    const delBtn = document.getElementById('btn-delete-session');
+    if (delBtn) {
+      delBtn.style.display = this.currentSession ? 'inline-flex' : 'none';
+    }
+
     if (!el) return;
 
     if (!this.currentSession) {
@@ -359,6 +364,72 @@ const Attendance = {
     } else {
       alert('ไม่สามารถสร้างองค์ประชุมได้: ' + (res && res.error ? res.error : 'ข้อผิดพลาดไม่ทราบสาเหตุ'));
       return false;
+    }
+  },
+
+  async deleteCurrentSession() {
+    if (!this.currentSessionId || !this.currentSession) {
+      alert('⚠️ ยังไม่ได้เลือกองค์ประชุมที่จะลบ');
+      return;
+    }
+
+    const title = this.currentSession.session_title;
+    const confirmMsg = `⚠️ คำเตือน: คุณต้องการลบวาระองค์ประชุมนี้ใช่หรือไม่?\n\n` +
+      `📌 หัวข้อ: "${title}" (${this.currentSession.session_date})\n\n` +
+      `เมื่อลบแล้ว:\n` +
+      `• รายการองค์ประชุมนี้จะถูกลบออกจากระบบ\n` +
+      `• ข้อมูลการเช็คชื่อทั้งหมดของวาระนี้จะถูกลบ\n` +
+      `• แท็บ "วาระ_${title.substring(0, 20)}" ใน Google Sheets จะถูกลบออกอัตโนมัติ\n\n` +
+      `ยืนยันการลบหรือไม่? (การกระทำนี้ไม่สามารถย้อนกลับได้)`;
+
+    if (!confirm(confirmMsg)) return;
+
+    const user = Auth.getUser();
+    const adminId = user ? user.adminId : 'admin01';
+
+    const btn = document.getElementById('btn-delete-session');
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = '⏳ กำลังลบ...';
+    }
+
+    try {
+      const res = await Api.requestPost('deleteSession', {
+        sessionId: this.currentSessionId,
+        adminId: adminId
+      });
+
+      if (res && res.success) {
+        alert(`✅ ลบวาระองค์ประชุม "${title}" และลบแท็บใน Google Sheets สำเร็จเรียบร้อยแล้ว!`);
+        
+        // ล้าง session ปัจจุบัน
+        const deletedId = this.currentSessionId;
+        this.currentSessionId = null;
+        this.currentSession = null;
+        this.records = {};
+
+        // นำออกจาก array sessions ทันที
+        if (Array.isArray(this.sessions)) {
+          this.sessions = this.sessions.filter(s => s.session_id !== deletedId);
+        }
+
+        // โหลดรายการและเรนเดอร์ใหม่
+        this.populateSessions(this.sessions);
+
+        // รีเฟรชสถิติ Dashboard
+        if (window.Dashboard) {
+          window.Dashboard.load();
+        }
+      } else {
+        alert('⚠️ ไม่สามารถลบวาระได้: ' + (res ? res.error : 'โปรดตรวจสอบการเชื่อมต่อ'));
+      }
+    } catch (err) {
+      alert('⚠️ เกิดข้อผิดพลาดในการลบ: ' + err.message);
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = '🗑️ ลบวาระนี้';
+      }
     }
   },
 

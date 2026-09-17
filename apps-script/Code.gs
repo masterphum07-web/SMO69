@@ -381,6 +381,10 @@ function doGet(e) {
         result = submitAttendance(e.parameter.sessionId, e.parameter.adminId);
         break;
 
+      case 'deleteSession':
+        result = deleteSession(e.parameter.sessionId, e.parameter.adminId);
+        break;
+
       case 'login':
         result = loginCheck(e.parameter.adminId, e.parameter.pin);
         break;
@@ -431,6 +435,10 @@ function doPost(e) {
 
       case 'submitAttendance':
         result = submitAttendance(payload.sessionId, payload.adminId);
+        break;
+
+      case 'deleteSession':
+        result = deleteSession(payload.sessionId, payload.adminId);
         break;
 
       default:
@@ -726,6 +734,95 @@ function submitAttendance(sessionId, adminId) {
     }
 
     return { success: true, message: 'ยืนยันและปิดรอบการเช็คชื่อเรียบร้อยแล้ว พร้อมบันทึกรายงานผลใน Google Sheets สำเร็จ' };
+  } catch (err) {
+    return { success: false, error: err.toString() };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * ฟังก์ชันลบวาระองค์ประชุมออกจากระบบและ Google Sheets อย่างปลอดภัย
+ * จะทำการ:
+ * 1. ลบข้อมูลในชีต Sessions
+ * 2. ลบประวัติการเช็คชื่อทั้งหมดของวาระนี้ในชีต Attendance
+ * 3. ลบแท็บเฉพาะของวาระนี้ (วาระ_...)
+ * 4. คำนวณ Dashboard Summary ใหม่
+ * 5. อัปเดตแท็บสรุปล่าสุด
+ */
+function deleteSession(sessionId, adminId) {
+  if (!sessionId) {
+    return { success: false, error: 'ไม่พบ Session ID' };
+  }
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+    // 1. หาข้อมูล Session เพื่อดึงชื่อวาระมาลบแท็บ
+    const sessSheet = setSheet(SHEETS.SESSIONS);
+    const sessData = sessSheet.getDataRange().getValues();
+    let sessionTitle = '';
+    let foundRow = -1;
+
+    for (let i = 1; i < sessData.length; i++) {
+      if (String(sessData[i][0]).trim() === String(sessionId).trim()) {
+        foundRow = i + 1;
+        sessionTitle = String(sessData[i][1]).trim();
+        break;
+      }
+    }
+
+    if (foundRow === -1) {
+      return { success: false, error: 'ไม่พบองค์ประชุมนี้ในระบบ' };
+    }
+
+    // 2. ลบแถวในชีต Sessions
+    sessSheet.deleteRow(foundRow);
+
+    // 3. ลบประวัติการเช็คชื่อในชีต Attendance ที่ตรงกับ sessionId นี้ (ลบจากล่างขึ้นบน)
+    const attSheet = setSheet(SHEETS.ATTENDANCE);
+    const attData = attSheet.getDataRange().getValues();
+    for (let i = attData.length - 1; i >= 1; i--) {
+      if (String(attData[i][0]).trim() === String(sessionId).trim()) {
+        attSheet.deleteRow(i + 1);
+      }
+    }
+
+    // 4. ลบแท็บเฉพาะของวาระนี้ (วาระ_...) ถ้ามีอยู่
+    const cleanTitle = (sessionTitle || sessionId)
+      .replace(/[\[\]\*\?:\/\\\'\"]/g, '')
+      .trim()
+      .substring(0, 25);
+    const sessionSheetName = 'วาระ_' + (cleanTitle || sessionId);
+    const targetSheet = ss.getSheetByName(sessionSheetName);
+    if (targetSheet) {
+      try {
+        ss.deleteSheet(targetSheet);
+      } catch (delErr) {
+        Logger.log('Could not delete sheet ' + sessionSheetName + ': ' + delErr.toString());
+      }
+    }
+
+    SpreadsheetApp.flush();
+
+    // 5. คำนวณสรุป Dashboard ใหม่
+    updateDashboardSummary();
+
+    // 6. อัปเดตแท็บสรุปล่าสุด
+    if (sessSheet.getLastRow() > 1) {
+      generateLatestSessionReport();
+    } else {
+      setupSessionReportTemplate();
+    }
+
+    Logger.log('✅ ลบวาระองค์ประชุมสำเร็จ: ' + sessionTitle + ' (ID: ' + sessionId + ')');
+    return {
+      success: true,
+      message: 'ลบวาระองค์ประชุม "' + sessionTitle + '" และลบข้อมูลที่เกี่ยวข้องทั้งหมดใน Google Sheets เรียบร้อยแล้ว'
+    };
   } catch (err) {
     return { success: false, error: err.toString() };
   } finally {
