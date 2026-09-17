@@ -11,12 +11,12 @@
       "color_hex": "#8B5CF6"
     },
     {
-      "branch_id": "EMT",
+      "branch_id": "PMD",
       "branch_name": "ฉุกเฉินการแพทย์",
       "color_hex": "#EF4444"
     },
     {
-      "branch_id": "MR_BSC",
+      "branch_id": "BSC",
       "branch_name": "วท.บ.เวชระเบียน",
       "color_hex": "#06B6D4"
     },
@@ -26,7 +26,7 @@
       "color_hex": "#10B981"
     },
     {
-      "branch_id": "MR_DIP",
+      "branch_id": "DIP",
       "branch_name": "ปวส.เวชระเบียน",
       "color_hex": "#F59E0B"
     }
@@ -149,133 +149,133 @@
     {
       "student_id": "69301",
       "full_name": "นายธนโชติ พันธุ์ลำเจียก",
-      "branch_id": "EMT",
+      "branch_id": "PMD",
       "position": "ฝ่ายอุปนายก"
     },
     {
       "student_id": "69302",
       "full_name": "นายแทนไท พรมชาติ",
-      "branch_id": "EMT",
+      "branch_id": "PMD",
       "position": "ฝ่ายเลขานุการ"
     },
     {
       "student_id": "69303",
       "full_name": "นางสาวจิรภา แดงสังวาลย์",
-      "branch_id": "EMT",
+      "branch_id": "PMD",
       "position": "ฝ่ายเหรัญญิก"
     },
     {
       "student_id": "69304",
       "full_name": "นางสาวสุภัสสรา ธรรมจิตติ",
-      "branch_id": "EMT",
+      "branch_id": "PMD",
       "position": "ฝ่ายวิชาการ"
     },
     {
       "student_id": "69305",
       "full_name": "นางสาวธนพร ตรีโอษฐ์",
-      "branch_id": "EMT",
+      "branch_id": "PMD",
       "position": "ฝ่ายประสานงาน"
     },
     {
       "student_id": "69306",
       "full_name": "นางสาวณัฐนิชา ครุฑวิชิต",
-      "branch_id": "EMT",
+      "branch_id": "PMD",
       "position": "ฝ่ายประชาสัมพันธ์ (เฮด)"
     },
     {
       "student_id": "69307",
       "full_name": "นางสาวณัฐกมล สีชมภู",
-      "branch_id": "EMT",
+      "branch_id": "PMD",
       "position": "ฝ่านอาคารและสถานที่"
     },
     {
       "student_id": "69308",
       "full_name": "นางสาวธันณธรณ์ จวงจันทร์",
-      "branch_id": "EMT",
+      "branch_id": "PMD",
       "position": "ฝ่ายกีฬา (เฮด)"
     },
     {
       "student_id": "69309",
       "full_name": "นางสาวสุพาณี ผมเหมาะ",
-      "branch_id": "EMT",
+      "branch_id": "PMD",
       "position": "ฝ่ายสวัสดิการ"
     },
     {
       "student_id": "69310",
       "full_name": "นายณัฐเศรษฐ ใจสุข",
-      "branch_id": "EMT",
+      "branch_id": "PMD",
       "position": "ฝ่ายโสต (เฮด)"
     },
     {
       "student_id": "69311",
       "full_name": "นางสาวหทัยรัตน์ ชูรักษ์",
-      "branch_id": "EMT",
+      "branch_id": "PMD",
       "position": "ฝ่ายประสานงาน"
     },
     {
       "student_id": "69401",
       "full_name": "นางสาวชนันภรณ์ เผือกผุด",
-      "branch_id": "MR_BSC",
+      "branch_id": "BSC",
       "position": "อุปนายก"
     },
     {
       "student_id": "69402",
       "full_name": "ลาภวัต มหาวงศ์",
-      "branch_id": "MR_BSC",
+      "branch_id": "BSC",
       "position": "ฝ่ายเลขานุการ"
     },
     {
       "student_id": "69403",
       "full_name": "นางสาวฤทัยชนก วัตนานุสิทธิ์",
-      "branch_id": "MR_BSC",
+      "branch_id": "BSC",
       "position": "ฝ่ายกิจกรรม"
     },
     {
       "student_id": "69404",
       "full_name": "นางสาวศิริยาพร บุญมี",
-      "branch_id": "MR_BSC",
+      "branch_id": "BSC",
       "position": "ฝ่ายประสานงาน"
     },
     {
       "student_id": "69405",
       "full_name": "นางสาวเกวลิน ฤาชา",
-      "branch_id": "MR_BSC",
+      "branch_id": "BSC",
       "position": "ฝ่ายเหรัญญิก (เฮด)"
     },
     {
       "student_id": "69406",
       "full_name": "นางสาวบุษรากร ชูคันหอม",
-      "branch_id": "MR_BSC",
+      "branch_id": "BSC",
       "position": "ฝ่ายสวัสดิการ"
     },
     {
       "student_id": "69407",
       "full_name": "นางสาวณัฐฐา ตราโต",
-      "branch_id": "MR_BSC",
+      "branch_id": "BSC",
       "position": "ฝ่ายสวัสดิการ"
     },
     {
       "student_id": "69408",
       "full_name": "นางสาวชุติกาญจน์ ละกะเต็บ",
-      "branch_id": "MR_BSC",
+      "branch_id": "BSC",
       "position": "ฝ่ายวิชาการ"
     },
     {
       "student_id": "69409",
       "full_name": "นายพิทักษ์พงศ์ สาหินกอง",
-      "branch_id": "MR_BSC",
+      "branch_id": "BSC",
       "position": "ฝ่ายประชาสัมพันธ์"
     },
     {
       "student_id": "69410",
       "full_name": "นายคุณากร ชุมพล",
-      "branch_id": "MR_BSC",
+      "branch_id": "BSC",
       "position": "ฝ่ายโสต"
     },
     {
       "student_id": "69411",
       "full_name": "นายธนพันธุ์ จะปะการ",
-      "branch_id": "MR_BSC",
+      "branch_id": "BSC",
       "position": "ฝ่ายโสต"
     },
     {
@@ -341,13 +341,13 @@
     {
       "student_id": "69601",
       "full_name": "นางสาวจุฑามาศ องอาจ",
-      "branch_id": "MR_DIP",
+      "branch_id": "DIP",
       "position": "อุปนายก"
     },
     {
       "student_id": "69602",
       "full_name": "นางสาวภาณุมาศ บุญนวน",
-      "branch_id": "MR_DIP",
+      "branch_id": "DIP",
       "position": "สันทนาการ"
     }
   ]
