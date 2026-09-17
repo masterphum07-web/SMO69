@@ -13,7 +13,8 @@ const SHEETS = {
   SESSIONS: 'Sessions',
   ATTENDANCE: 'Attendance',
   ADMINS: 'Admins',
-  DASHBOARD_SUMMARY: 'Dashboard_Summary'
+  DASHBOARD_SUMMARY: 'Dashboard_Summary',
+  SESSION_REPORT: 'บันทึกผลการเช็คชื่อ'
 };
 
 /**
@@ -170,6 +171,9 @@ function setupInitialDatabase() {
   ]);
   formatHeaderRow(dashSheet, '#0F2F57');
 
+  // 7. ชีต บันทึกผลการเช็คชื่อ (หน้าสำหรับบันทึกหลังจากเช็คเสร็จ พร้อมหัวข้อและไฮไลต์สี)
+  setupSessionReportTemplate();
+
   // อัปเดต Summary รอบแรก
   updateDashboardSummary();
 
@@ -192,6 +196,7 @@ function clearAllSampleData() {
   formatHeaderRow(attSheet, '#0F2F57');
 
   updateDashboardSummary();
+  setupSessionReportTemplate();
   Logger.log('✅ ลบข้อมูลจำลองทั้งหมดใน Google Sheet เรียบร้อยแล้ว!');
 }
 
@@ -253,6 +258,10 @@ function doGet(e) {
             dashboard: getDashboard()
           }
         };
+        break;
+
+      case 'generateReport':
+        result = generateSessionReport(e.parameter.sessionId);
         break;
 
       default:
@@ -536,6 +545,12 @@ function saveAttendanceDraft(sessionId, records, adminId) {
     }
 
     SpreadsheetApp.flush();
+    try {
+      generateSessionReport(sessionId);
+    } catch (repErr) {
+      Logger.log('Warning generating draft report: ' + repErr.toString());
+    }
+
     return { success: true, message: 'บันทึกสถานะเรียบร้อยแล้ว (' + records.length + ' รายการ)' };
   } catch (err) {
     return { success: false, error: err.toString() };
@@ -573,7 +588,14 @@ function submitAttendance(sessionId, adminId) {
 
     updateDashboardSummary();
 
-    return { success: true, message: 'ยืนยันและปิดรอบการเช็คชื่อเรียบร้อยแล้ว' };
+    // ⚡ สร้างแท็บบันทึกรายงานผลการเช็คชื่อ พร้อมหัวข้อและไฮไลต์สี
+    try {
+      generateSessionReport(sessionId);
+    } catch (repErr) {
+      Logger.log('Warning generating session report: ' + repErr.toString());
+    }
+
+    return { success: true, message: 'ยืนยันและปิดรอบการเช็คชื่อเรียบร้อยแล้ว พร้อมบันทึกรายงานผลใน Google Sheets สำเร็จ' };
   } catch (err) {
     return { success: false, error: err.toString() };
   } finally {
@@ -747,4 +769,409 @@ function getDashboard(filterBranch) {
     },
     students: list
   };
+}
+
+/**
+ * =========================================================================
+ * Session Report Sheet Generator (พร้อมหัวข้อองค์ประชุมและไฮไลต์สี)
+ * =========================================================================
+ */
+
+/**
+ * ฟังก์ชันสร้าง/รีเซ็ตแม่แบบแท็บ 'บันทึกผลการเช็คชื่อ'
+ */
+function setupSessionReportTemplate() {
+  const sheet = setSheet(SHEETS.SESSION_REPORT);
+  sheet.clear();
+
+  const titleRange = sheet.getRange(1, 1, 1, 6);
+  titleRange.merge();
+  titleRange.setValue('📋 บันทึกรายงานผลการเช็คชื่อองค์ประชุม (SMO 69 วทก.)');
+  titleRange.setBackground('#0F2F57');
+  titleRange.setFontColor('#FFFFFF');
+  titleRange.setFontSize(13);
+  titleRange.setFontWeight('bold');
+  titleRange.setHorizontalAlignment('center');
+  titleRange.setVerticalAlignment('middle');
+  sheet.setRowHeight(1, 38);
+
+  const subRange = sheet.getRange(2, 1, 1, 6);
+  subRange.merge();
+  subRange.setValue('ℹ️ ระบบจะสร้างและอัปเดตรายงานพร้อมไฮไลต์สีอัตโนมัติทันทีที่มีการบันทึกหรือส่งสรุปผลการเช็คชื่อ');
+  subRange.setBackground('#1E3A8A');
+  subRange.setFontColor('#E2E8F0');
+  subRange.setFontSize(10);
+  subRange.setHorizontalAlignment('center');
+  subRange.setVerticalAlignment('middle');
+  sheet.setRowHeight(2, 26);
+
+  const statRange = sheet.getRange(3, 1, 1, 6);
+  statRange.merge();
+  statRange.setValue('📊 สถานะ: พร้อมบันทึกข้อมูลองค์ประชุมใหม่');
+  statRange.setBackground('#D97706');
+  statRange.setFontColor('#FFFFFF');
+  statRange.setFontSize(10);
+  statRange.setFontWeight('bold');
+  statRange.setHorizontalAlignment('center');
+  statRange.setVerticalAlignment('middle');
+  sheet.setRowHeight(3, 28);
+
+  sheet.setRowHeight(4, 10);
+  sheet.getRange(4, 1, 1, 6).setBackground('#F8FAFC');
+
+  const colHeaders = ['ลำดับ', 'สาขาวิชา', 'ชื่อ - นามสกุล', 'ตำแหน่ง', 'สถานะการเข้าร่วม', 'วันเวลาที่บันทึก'];
+  const headerRange = sheet.getRange(5, 1, 1, 6);
+  headerRange.setValues([colHeaders]);
+  headerRange.setBackground('#0F2F57');
+  headerRange.setFontColor('#FFFFFF');
+  headerRange.setFontSize(10);
+  headerRange.setFontWeight('bold');
+  headerRange.setHorizontalAlignment('center');
+  headerRange.setVerticalAlignment('middle');
+  sheet.setRowHeight(5, 28);
+
+  const students = getStudentsData();
+  if (students.length > 0) {
+    const attMap = {};
+    const stats = { present: 0, late: 0, excused: 0, absent: 0, pending: students.length, rate: '0%' };
+    const dummySession = {
+      title: 'รอการเปิดรอบเช็คชื่อ',
+      date: Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyy-MM-dd'),
+      scope: 'ALL',
+      sessionId: 'WAITING',
+      status: 'waiting'
+    };
+    renderReportToSheet(sheet, dummySession, students, attMap, stats);
+  }
+}
+
+/**
+ * ฟังก์ชันสร้างรายงานขององค์ประชุมล่าสุด (สามารถคลิกสั่งการจาก Google Sheet ได้โดยตรง)
+ */
+function generateLatestSessionReport() {
+  const sessSheet = setSheet(SHEETS.SESSIONS);
+  const data = sessSheet.getDataRange().getValues();
+  if (data.length <= 1) {
+    setupSessionReportTemplate();
+    return { success: false, error: 'ยังไม่มีองค์ประชุมในระบบ' };
+  }
+
+  for (let i = data.length - 1; i >= 1; i--) {
+    if (data[i][0]) {
+      return generateSessionReport(String(data[i][0]).trim());
+    }
+  }
+  return { success: false, error: 'ไม่พบข้อมูลองค์ประชุม' };
+}
+
+/**
+ * ฟังก์ชันสร้างและวาดหน้าแท็บบันทึกผลการเช็คชื่อ พร้อมหัวข้อและไฮไลต์สีอย่างเป็นทางการ
+ * @param {string} sessionId - รหัสองค์ประชุม
+ */
+function generateSessionReport(sessionId) {
+  if (!sessionId) {
+    return generateLatestSessionReport();
+  }
+
+  const sessSheet = setSheet(SHEETS.SESSIONS);
+  const sessData = sessSheet.getDataRange().getValues();
+  let session = null;
+
+  for (let i = 1; i < sessData.length; i++) {
+    if (String(sessData[i][0]).trim() === String(sessionId).trim()) {
+      session = {
+        sessionId: String(sessData[i][0]).trim(),
+        title: String(sessData[i][1]).trim(),
+        date: sessData[i][2] instanceof Date ? Utilities.formatDate(sessData[i][2], 'Asia/Bangkok', 'yyyy-MM-dd') : String(sessData[i][2]),
+        scope: String(sessData[i][3]).trim(),
+        status: String(sessData[i][4]).trim(),
+        createdBy: String(sessData[i][5]).trim(),
+        createdAt: String(sessData[i][6])
+      };
+      break;
+    }
+  }
+
+  if (!session) {
+    return { success: false, error: 'ไม่พบองค์ประชุม ID: ' + sessionId };
+  }
+
+  const students = getStudentsData();
+  const attData = getSessionAttendanceData(sessionId);
+  const attMap = {};
+  attData.forEach(rec => {
+    attMap[rec.full_name] = rec;
+  });
+
+  let pCount = 0, lCount = 0, eCount = 0, aCount = 0, pendingCount = 0;
+  students.forEach(st => {
+    const att = attMap[st.full_name];
+    const s = att ? att.status : 'ยังไม่เช็ค';
+    if (s === 'มา') pCount++;
+    else if (s === 'สาย') lCount++;
+    else if (s === 'ลา') eCount++;
+    else if (s === 'ขาด') aCount++;
+    else pendingCount++;
+  });
+
+  const total = students.length;
+  const attendedCount = pCount + (lCount * 0.75);
+  const rate = total > 0 ? ((attendedCount / total) * 100).toFixed(1) + '%' : '0%';
+
+  const stats = {
+    present: pCount,
+    late: lCount,
+    excused: eCount,
+    absent: aCount,
+    pending: pendingCount,
+    rate: rate
+  };
+
+  // 1. วาดลงแท็บหลัก: 'บันทึกผลการเช็คชื่อ'
+  const reportSheet = setSheet(SHEETS.SESSION_REPORT);
+  renderReportToSheet(reportSheet, session, students, attMap, stats);
+
+  // 2. ถ้าเป็นองค์ประชุมที่ยืนยันส่งสรุปแล้ว ให้สำเนา/สร้างแท็บเฉพาะของวาระนี้เก็บไว้ด้วย
+  if (session.status === 'submitted') {
+    const cleanTitle = (session.title || session.sessionId)
+      .replace(/[:\\\/\?\*\[\]]/g, '')
+      .trim()
+      .substring(0, 25);
+    const archiveSheetName = 'รายงาน_' + cleanTitle;
+    const archiveSheet = setSheet(archiveSheetName);
+    renderReportToSheet(archiveSheet, session, students, attMap, stats);
+  }
+
+  SpreadsheetApp.flush();
+  Logger.log('✅ สร้างแท็บบันทึกรายงานผลการเช็คชื่อเรียบร้อย: ' + session.title);
+  return { success: true, message: 'สร้างแท็บบันทึกรายงานผลสำเร็จ' };
+}
+
+/**
+ * Helper: ลงข้อมูล จัดเลย์เอาต์ และระบายสีไฮไลต์ลงในชีตเป้าหมาย
+ */
+function renderReportToSheet(sheet, session, students, attMap, stats) {
+  sheet.clear();
+
+  // ปลดการ Merge เดิม (ถ้ามี)
+  const maxRows = sheet.getMaxRows();
+  const maxCols = sheet.getMaxColumns();
+  if (maxRows > 1 && maxCols > 1) {
+    try {
+      sheet.getRange(1, 1, maxRows, maxCols).breakApart();
+    } catch (e) {}
+  }
+
+  // ปรับจำนวนแถวและคอลัมน์ให้เพียงพอ
+  const neededRows = students.length + 8;
+  if (sheet.getMaxRows() < neededRows) {
+    sheet.insertRowsAfter(sheet.getMaxRows(), neededRows - sheet.getMaxRows());
+  }
+  if (sheet.getMaxColumns() < 6) {
+    sheet.insertColumnsAfter(sheet.getMaxColumns(), 6 - sheet.getMaxColumns());
+  }
+
+  // ---------------- แถวที่ 1: หัวข้อองค์ประชุมหลัก ----------------
+  const titleRange = sheet.getRange(1, 1, 1, 6);
+  titleRange.merge();
+  titleRange.setValue('📋 รายงานผลการเช็คชื่อองค์ประชุม: ' + (session.title || 'ไม่ระบุชื่อวาระ'));
+  titleRange.setBackground('#0F2F57'); // Royal Navy
+  titleRange.setFontColor('#FFFFFF');
+  titleRange.setFontSize(13);
+  titleRange.setFontWeight('bold');
+  titleRange.setHorizontalAlignment('center');
+  titleRange.setVerticalAlignment('middle');
+  sheet.setRowHeight(1, 38);
+
+  // ---------------- แถวที่ 2: ข้อมูลองค์ประชุมและวันเวลา ----------------
+  const subRange = sheet.getRange(2, 1, 1, 6);
+  subRange.merge();
+  const statusThai = session.status === 'submitted' ? '✅ ยืนยันสรุปผลแล้ว' : '📝 ฉบับร่าง (กำลังเช็คชื่อ)';
+  const subText = '📅 วันที่จัดประชุม: ' + session.date + 
+                  '   |   🎯 กลุ่มเป้าหมาย: ' + session.scope + 
+                  '   |   🆔 รหัส: ' + session.sessionId + 
+                  '   |   สถานะ: ' + statusThai + 
+                  '   |   อัปเดตล่าสุด: ' + Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyy-MM-dd HH:mm:ss');
+  subRange.setValue(subText);
+  subRange.setBackground('#1E3A8A');
+  subRange.setFontColor('#E2E8F0');
+  subRange.setFontSize(9);
+  subRange.setFontWeight('normal');
+  subRange.setHorizontalAlignment('center');
+  subRange.setVerticalAlignment('middle');
+  sheet.setRowHeight(2, 26);
+
+  // ---------------- แถวที่ 3: แถบสรุปยอดตัวเลขและเปอร์เซ็นต์ ----------------
+  const statRange = sheet.getRange(3, 1, 1, 6);
+  statRange.merge();
+  const statText = '📊 สรุปยอด:  มา ' + stats.present + ' คน   |   ' +
+                   'มาสาย ' + stats.late + ' คน   |   ' +
+                   'ขอลา ' + stats.excused + ' คน   |   ' +
+                   'ขาด ' + stats.absent + ' คน   |   ' +
+                   'ยังไม่เช็ค ' + stats.pending + ' คน   |   ' +
+                   'รวมทั้งสิ้น ' + students.length + ' คน  (คิดเป็น ' + stats.rate + ')';
+  statRange.setValue(statText);
+  statRange.setBackground('#D97706'); // Imperial Gold
+  statRange.setFontColor('#FFFFFF');
+  statRange.setFontSize(10);
+  statRange.setFontWeight('bold');
+  statRange.setHorizontalAlignment('center');
+  statRange.setVerticalAlignment('middle');
+  sheet.setRowHeight(3, 28);
+
+  // ---------------- แถวที่ 4: แถวว่างคั่นสายตา ----------------
+  sheet.setRowHeight(4, 10);
+  sheet.getRange(4, 1, 1, 6).setBackground('#F8FAFC');
+
+  // ---------------- แถวที่ 5: หัวตารางข้อมูล ----------------
+  const colHeaders = ['ลำดับ', 'สาขาวิชา', 'ชื่อ - นามสกุล', 'ตำแหน่ง', 'สถานะการเข้าร่วม', 'วันเวลาที่บันทึก'];
+  const headerRange = sheet.getRange(5, 1, 1, 6);
+  headerRange.setValues([colHeaders]);
+  headerRange.setBackground('#0F2F57');
+  headerRange.setFontColor('#FFFFFF');
+  headerRange.setFontSize(10);
+  headerRange.setFontWeight('bold');
+  headerRange.setHorizontalAlignment('center');
+  headerRange.setVerticalAlignment('middle');
+  sheet.setRowHeight(5, 28);
+
+  // ---------------- แถวที่ 6 เป็นต้นไป: ข้อมูลรายชื่อ 53 คน พร้อมไฮไลต์สี ----------------
+  const values = [];
+  const backgrounds = [];
+  const fontColors = [];
+  const fontWeights = [];
+  const alignments = [];
+
+  students.forEach((st, idx) => {
+    const att = attMap[st.full_name];
+    const rawStatus = att ? att.status : 'ยังไม่เช็ค';
+    const timestamp = att ? att.timestamp : '-';
+
+    // การกำหนดข้อความและสีไฮไลต์ของแต่ละสถานะ (ตรงตามที่ผู้ใช้ร้องขอ)
+    let statusDisplay = '⏳ ยังไม่เช็ค';
+    let statusBg = '#F1F5F9';
+    let statusText = '#475569';
+
+    if (rawStatus === 'มา') {
+      statusDisplay = '✅ มา';
+      statusBg = '#DCFCE7'; // เขียวอ่อนพาสเทล
+      statusText = '#15803D'; // เขียวเข้ม
+    } else if (rawStatus === 'สาย') {
+      statusDisplay = '⏰ มาสาย';
+      statusBg = '#FEF3C7'; // ส้ม/เหลืองอ่อน
+      statusText = '#B45309'; // ส้มเข้ม
+    } else if (rawStatus === 'ลา') {
+      statusDisplay = '📝 ขอลา';
+      statusBg = '#DBEAFE'; // ฟ้าอ่อน
+      statusText = '#1D4ED8'; // น้ำเงินเข้ม
+    } else if (rawStatus === 'ขาด') {
+      statusDisplay = '❌ ขาด';
+      statusBg = '#FEE2E2'; // แดงอ่อน
+      statusText = '#B91C1C'; // แดงเข้ม
+    }
+
+    // สีอ่อนประจำสาขาวิชาในคอลัมน์ที่ 2
+    let branchBg = '#FFFFFF';
+    if (st.branch_id === 'RT')  branchBg = '#EFF6FF';
+    else if (st.branch_id === 'HCI') branchBg = '#F5F3FF';
+    else if (st.branch_id === 'PMD') branchBg = '#FEF2F2';
+    else if (st.branch_id === 'BSC') branchBg = '#ECFEFF';
+    else if (st.branch_id === 'TTM') branchBg = '#ECFDF5';
+    else if (st.branch_id === 'DIP') branchBg = '#FFFBEB';
+
+    const rowBg = (idx % 2 === 0) ? '#FFFFFF' : '#F8FAFC';
+
+    values.push([
+      idx + 1,
+      st.branch_id,
+      st.full_name,
+      st.position || '-',
+      statusDisplay,
+      timestamp
+    ]);
+
+    backgrounds.push([
+      rowBg,
+      branchBg,
+      rowBg,
+      rowBg,
+      statusBg,
+      rowBg
+    ]);
+
+    fontColors.push([
+      '#64748B',
+      '#0F172A',
+      '#0F172A',
+      '#334155',
+      statusText,
+      '#64748B'
+    ]);
+
+    fontWeights.push([
+      'normal',
+      'bold',
+      'normal',
+      'normal',
+      'bold',
+      'normal'
+    ]);
+
+    alignments.push([
+      'center',
+      'center',
+      'left',
+      'left',
+      'center',
+      'center'
+    ]);
+  });
+
+  const dataRange = sheet.getRange(6, 1, values.length, 6);
+  dataRange.setValues(values);
+  dataRange.setBackgrounds(backgrounds);
+  dataRange.setFontColors(fontColors);
+  dataRange.setFontWeights(fontWeights);
+  dataRange.setHorizontalAlignments(alignments);
+  dataRange.setVerticalAlignment('middle');
+  dataRange.setFontSize(9);
+
+  // ตั้งค่าความสูงแถว
+  for (let r = 0; r < values.length; r++) {
+    sheet.setRowHeight(6 + r, 24);
+  }
+
+  // กำหนดความกว้างคอลัมน์ให้อ่านง่าย พอดีกับข้อความ
+  sheet.setColumnWidth(1, 55);   // ลำดับ
+  sheet.setColumnWidth(2, 85);   // สาขาวิชา
+  sheet.setColumnWidth(3, 230);  // ชื่อ - นามสกุล
+  sheet.setColumnWidth(4, 180);  // ตำแหน่ง
+  sheet.setColumnWidth(5, 140);  // สถานะการเข้าร่วม (พร้อมไฮไลต์)
+  sheet.setColumnWidth(6, 170);  // วันเวลาที่บันทึก
+
+  // ใส่เส้นขอบตาราง (Borders)
+  const fullTableRange = sheet.getRange(5, 1, values.length + 1, 6);
+  fullTableRange.setBorder(true, true, true, true, true, true, '#CBD5E1', SpreadsheetApp.BorderStyle.SOLID);
+
+  // ตรึงแถวที่ 1-5 ไว้ด้านบนเสมอ
+  sheet.setFrozenRows(5);
+}
+
+/**
+ * เมนูด่วนบน Google Sheets (ปรากฏอัตโนมัติเมื่อเปิดไฟล์)
+ */
+function onOpen() {
+  try {
+    const ui = SpreadsheetApp.getUi();
+    ui.createMenu('📋 ระบบเช็คชื่อ SMO 69')
+      .addItem('📊 สร้าง/อัปเดตแท็บรายงานผล (องค์ประชุมล่าสุด)', 'generateLatestSessionReport')
+      .addSeparator()
+      .addItem('⚡ อัปเดตชีต Branches (6 สาขา)', 'updateBranchesOnly')
+      .addItem('👥 อัปเดตชีต Students (53 คน)', 'updateStudentsOnly')
+      .addItem('🧹 ล้างข้อมูลตัวอย่างทั้งหมด', 'clearAllSampleData')
+      .addItem('⚙️ รีเซ็ตระบบเริ่มต้น (setupInitialDatabase)', 'setupInitialDatabase')
+      .addToUi();
+  } catch (err) {
+    // กรณีที่ไม่ได้เปิดผ่าน Spreadsheet UI โดยตรง
+  }
 }
