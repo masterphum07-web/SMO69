@@ -4,6 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ระบบเช็คชื่อสโมสรนักศึกษาปี 69 | วิทยาลัยเทคโนโลยีทางการแพทย์และสาธารณสุข กาญจนาภิเษก</title>
+  
+  <!-- Google Fonts: Prompt, Kanit, Chakra Petch, Inter (ฟอนต์สไตล์โมเดิร์นล้ำยุคตามรูปอ้างอิง) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Inter:wght@300;400;500;600;700;800&family=Kanit:wght@300;400;500;600;700;800;900&family=Prompt:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,400&display=swap" rel="stylesheet">
+
   <link rel="stylesheet" href="css/style.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📋</text></svg>">
 </head>
@@ -67,13 +73,13 @@
       <!-- Session Banner ล่าสุด -->
       <div class="session-banner">
         <div>
-          <div class="text-xs text-muted font-semibold" style="text-transform: uppercase; letter-spacing: 0.05em;">องค์ประชุมล่าสุด</div>
-          <h2 id="public-session-title" style="font-size: 1.3rem; margin: 0.2rem 0;">กำลังโหลดข้อมูล...</h2>
-          <div id="public-session-date" class="text-sm text-muted"></div>
+          <div class="banner-eyebrow">• องค์ประชุมล่าสุด • SMO 69 วทก.</div>
+          <h2 id="public-session-title">กำลังโหลดข้อมูล...</h2>
+          <div id="public-session-date"></div>
         </div>
-        <div style="display: flex; align-items: center; gap: 0.75rem;">
+        <div style="display: flex; align-items: center; gap: 0.85rem; flex-wrap: wrap;">
           <span id="public-session-badge" class="status-badge status-late">กำลังเช็คชื่อ</span>
-          <div id="public-poll-indicator" class="text-xs text-muted">
+          <div id="public-poll-indicator" class="text-xs text-muted" style="font-family: var(--font-tech);">
             <span class="pulse-dot active"></span> เรียลไทม์ (Auto Sync)
           </div>
         </div>
@@ -187,8 +193,8 @@
         </div>
 
         <!-- Quick Counters & Quick Actions -->
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; background: #F8FAFC; padding: 0.75rem 1rem; border-radius: var(--radius-md); margin-bottom: 1rem; border: 1px solid var(--border-color);">
-          <div class="text-sm font-semibold" style="display: flex; gap: 1rem; flex-wrap: wrap;">
+        <div class="quick-summary-panel">
+          <div class="quick-summary-counts font-semibold">
             <span>มา: <b id="count-present" class="text-success">0</b></span>
             <span>สาย: <b id="count-late" class="text-warning">0</b></span>
             <span>ลา: <b id="count-excused" class="text-primary">0</b></span>
@@ -356,7 +362,7 @@
           <input type="password" id="login-pin" class="form-input" placeholder="รหัส PIN 4 หลัก" required maxlength="10">
         </div>
         <div id="login-error-msg" class="text-danger text-sm" style="display: none; margin-bottom: 1rem;"></div>
-        <div style="background: #F8FAFC; border: 1px solid var(--border-color); padding: 0.65rem 0.85rem; border-radius: var(--radius-sm); font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">
+        <div class="cyber-hint-box">
           💡 <b>รหัสทดสอบเบื้องต้น:</b><br>
           • แอดมิน: <code>admin01</code> | PIN: <code>1234</code><br>
           • ผู้เช็คชื่อ: <code>checker01</code> | PIN: <code>1234</code>
@@ -433,7 +439,7 @@
           </label>
         </div>
 
-        <div style="background: #FEF3C7; border: 1px solid #FCD34D; padding: 0.75rem; border-radius: var(--radius-sm); font-size: 0.8rem; color: #92400E; margin-bottom: 1.25rem;">
+        <div class="cyber-warning-box">
           📌 <b>คำแนะนำ:</b> ไฟล์โค้ด Google Apps Script ตัวเต็มอยู่ที่ <code>apps-script/Code.gs</code> สามารถก๊อปปี้ไปวางใน Extensions &gt; Apps Script ใน Google Sheets ได้ทันที
         </div>
 
