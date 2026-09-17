@@ -87,14 +87,15 @@ const Attendance = {
 
     if (res && res.success && Array.isArray(res.data)) {
       res.data.forEach(item => {
-        this.records[item.student_id] = item.status;
+        const key = item.full_name || item.student_id;
+        this.records[key] = item.status;
       });
     }
 
     this.render();
   },
 
-  setStatus(studentId, status) {
+  setStatus(fullName, status) {
     if (!this.currentSession) {
       alert('กรุณาเลือกหรือสร้างองค์ประชุมก่อนเช็คชื่อ');
       return;
@@ -105,8 +106,8 @@ const Attendance = {
       if (!confirmEdit) return;
     }
 
-    this.records[studentId] = status;
-    this.updateRowUI(studentId, status);
+    this.records[fullName] = status;
+    this.updateRowUI(fullName, status);
     this.updateSummaryCounts();
 
     // Auto-save draft แบบ debounce 800ms
@@ -132,9 +133,9 @@ const Attendance = {
     const user = Auth.getUser();
     const adminId = user ? user.adminId : 'admin01';
 
-    const recordsArray = Object.keys(this.records).map(studentId => ({
-      student_id: studentId,
-      status: this.records[studentId]
+    const recordsArray = Object.keys(this.records).map(name => ({
+      full_name: name,
+      status: this.records[name]
     }));
 
     if (recordsArray.length === 0) return;
@@ -256,7 +257,7 @@ const Attendance = {
       const query = this.searchQuery.trim().toLowerCase();
       const matchSearch = !query ||
         st.full_name.toLowerCase().includes(query) ||
-        st.student_id.toLowerCase().includes(query);
+        (st.position && st.position.toLowerCase().includes(query));
       return matchBranch && matchSearch;
     });
   },
@@ -269,22 +270,21 @@ const Attendance = {
     container.innerHTML = '';
 
     if (filtered.length === 0) {
-      container.innerHTML = `<tr><td colspan="5" class="empty-state">ไม่พบข้อมูลนักศึกษาตามเงื่อนไขที่เลือก</td></tr>`;
+      container.innerHTML = `<tr><td colspan="4" class="empty-state">ไม่พบข้อมูลสมาชิกตามเงื่อนไขที่เลือก</td></tr>`;
       this.updateSummaryCounts();
       return;
     }
 
     filtered.forEach((st, idx) => {
-      const currentStatus = this.records[st.student_id] || '';
+      const currentStatus = this.records[st.full_name] || '';
       const branch = this.branches.find(b => b.branch_id === st.branch_id) || { branch_name: st.branch_id, color_hex: '#6B7280' };
 
       const tr = document.createElement('tr');
-      tr.id = `row-student-${st.student_id}`;
+      tr.id = `row-student-${idx}`;
       tr.className = 'student-row';
 
       tr.innerHTML = `
         <td class="col-num text-center">${idx + 1}</td>
-        <td class="col-id font-mono font-semibold">${st.student_id}</td>
         <td class="col-name">
           <div class="name-box">
             <span class="student-name">${st.full_name}</span>
@@ -295,22 +295,22 @@ const Attendance = {
           </div>
         </td>
         <td class="col-status-badge text-center">
-          <span id="badge-${st.student_id}" class="status-badge status-${this.getStatusClass(currentStatus)}">
+          <span id="badge-${idx}" class="status-badge status-${this.getStatusClass(currentStatus)}">
             ${currentStatus || 'ยังไม่เช็ค'}
           </span>
         </td>
         <td class="col-actions text-center">
           <div class="btn-status-group">
-            <button type="button" class="btn-status btn-present ${currentStatus === 'มา' ? 'active' : ''}" onclick="Attendance.setStatus('${st.student_id}', 'มา')">
+            <button type="button" class="btn-status btn-present ${currentStatus === 'มา' ? 'active' : ''}" onclick="Attendance.setStatus('${st.full_name}', 'มา', ${idx})">
               ✓ มา
             </button>
-            <button type="button" class="btn-status btn-late ${currentStatus === 'สาย' ? 'active' : ''}" onclick="Attendance.setStatus('${st.student_id}', 'สาย')">
+            <button type="button" class="btn-status btn-late ${currentStatus === 'สาย' ? 'active' : ''}" onclick="Attendance.setStatus('${st.full_name}', 'สาย', ${idx})">
               ⏰ สาย
             </button>
-            <button type="button" class="btn-status btn-excused ${currentStatus === 'ลา' ? 'active' : ''}" onclick="Attendance.setStatus('${st.student_id}', 'ลา')">
+            <button type="button" class="btn-status btn-excused ${currentStatus === 'ลา' ? 'active' : ''}" onclick="Attendance.setStatus('${st.full_name}', 'ลา', ${idx})">
               ✉️ ลา
             </button>
-            <button type="button" class="btn-status btn-absent ${currentStatus === 'ขาด' ? 'active' : ''}" onclick="Attendance.setStatus('${st.student_id}', 'ขาด')">
+            <button type="button" class="btn-status btn-absent ${currentStatus === 'ขาด' ? 'active' : ''}" onclick="Attendance.setStatus('${st.full_name}', 'ขาด', ${idx})">
               ✕ ขาด
             </button>
           </div>
@@ -323,14 +323,14 @@ const Attendance = {
     this.updateBranchBadges();
   },
 
-  updateRowUI(studentId, status) {
-    const badge = document.getElementById(`badge-${studentId}`);
+  updateRowUI(idx, status) {
+    const badge = document.getElementById(`badge-${idx}`);
     if (badge) {
       badge.textContent = status || 'ยังไม่เช็ค';
       badge.className = `status-badge status-${this.getStatusClass(status)}`;
     }
 
-    const row = document.getElementById(`row-student-${studentId}`);
+    const row = document.getElementById(`row-student-${idx}`);
     if (row) {
       const btns = row.querySelectorAll('.btn-status');
       btns.forEach(btn => {
@@ -348,7 +348,7 @@ const Attendance = {
     const filtered = this.getFilteredStudents();
 
     filtered.forEach(st => {
-      const s = this.records[st.student_id];
+      const s = this.records[st.full_name];
       if (s === 'มา') present++;
       else if (s === 'สาย') late++;
       else if (s === 'ลา') excused++;

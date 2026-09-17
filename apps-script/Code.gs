@@ -32,7 +32,7 @@ function setSheet(sheetName) {
 
 /**
  * ฟังก์ชันสร้างฐานข้อมูลและตารางเริ่มต้นอัตโนมัติ (รันครั้งเดียวใน Apps Script)
- * บรรจุรายชื่อสโมสรนักศึกษาปี 2569 ครบทั้ง 6 สาขาวิชา รวม 53 คน
+ * บรรจุรายชื่อสโมสรนักศึกษาปี 2569 ครบทั้ง 6 สาขาวิชา รวม 53 คน (ไม่มี student_id ใช้ชื่อ-สกุลจริง)
  */
 function setupInitialDatabase() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -56,61 +56,62 @@ function setupInitialDatabase() {
   // 2. ชีต Students (53 คน)
   const sSheet = setSheet(SHEETS.STUDENTS);
   if (sSheet.getLastRow() === 0) {
-    sSheet.appendRow(['student_id', 'full_name', 'branch_id', 'position']);
+    bSheet.setFrozenRows(1);
+    sSheet.appendRow(['full_name', 'branch_id', 'position']);
     const realStudents = [
-      ['69101', 'นางสาวภัทรวรินทร์ เกษมสุข', 'RT', 'นายก'],
-      ['69102', 'นางสาวประภัสสร วงษ์กำภู', 'RT', 'ฝ่ายเลขานุการ (เฮด)'],
-      ['69103', 'นายบดินทร์ การุณเวทย์', 'RT', 'ฝ่ายเหรัญญิก'],
-      ['69104', 'นายภูมิภัทร สว่างเวียง', 'RT', 'ฝ่ายวิชาการ'],
-      ['69105', 'นางสาวดอกรัก อิสระอังกูร', 'RT', 'ฝ่ายประสานงาน (เฮด)'],
-      ['69106', 'นางสาวอัญญานี อาสะหนิ', 'RT', 'ฝ่ายประชาสัมพันธ์'],
-      ['69107', 'นางสาวพิมพ์พันธุ์ กล่องทอง', 'RT', 'ฝ่ายกิจกรรม (เฮด)'],
-      ['69108', 'นายศรัณย์ อินทรีย์', 'RT', 'ฝ่ายโสต'],
-      ['69109', 'นางสาวจินตนา ศรีเริ่มสกุล', 'RT', 'ฝ่ายสถานที่ (เฮด)'],
-      ['69201', 'นางสาวจุฑามณี สมบัติ', 'HCI', 'อุปนายก'],
-      ['69202', 'นางสาวณัจมีย์ ปูเตะ', 'HCI', 'ฝ่ายประชาสัมพันธ์'],
-      ['69203', 'นางสาวปิญชาน อุดมโภชน์', 'HCI', 'ฝ่ายเลขานุการ'],
-      ['69204', 'นายคิมภกรณ์ ไชยขันธุ์', 'HCI', 'ฝ่ายโสต'],
-      ['69205', 'นางสาวกุลนิษฐ์ ประดิษฐ์ธรรม', 'HCI', 'ฝ่ายเฮดวิชาการ'],
-      ['69206', 'นางสาวอนัญญา ปานหงษ์', 'HCI', 'ฝ่ายประสานงาน'],
-      ['69207', 'นางสาวปาลิดา โลกาวัฒนะ', 'HCI', 'ฝ่ายเฮดฝ่ายทะเบียน'],
-      ['69208', 'นางสาวแวตัสนีม แวหะมุ', 'HCI', 'ฝ่ายสวัสดิการ'],
-      ['69209', 'นางสาวพัทรวรรณ คำภิโล', 'HCI', 'ฝ่ายกีฬา'],
-      ['69210', 'นายอนุชา รักบูรณ์', 'HCI', 'ฝ่ายเหรัญญิก'],
-      ['69301', 'นายธนโชติ พันธุ์ลำเจียก', 'PMD', 'ฝ่ายอุปนายก'],
-      ['69302', 'นายแทนไท พรมชาติ', 'PMD', 'ฝ่ายเลขานุการ'],
-      ['69303', 'นางสาวจิรภา แดงสังวาลย์', 'PMD', 'ฝ่ายเหรัญญิก'],
-      ['69304', 'นางสาวสุภัสสรา ธรรมจิตติ', 'PMD', 'ฝ่ายวิชาการ'],
-      ['69305', 'นางสาวธนพร ตรีโอษฐ์', 'PMD', 'ฝ่ายประสานงาน'],
-      ['69306', 'นางสาวณัฐนิชา ครุฑวิชิต', 'PMD', 'ฝ่ายประชาสัมพันธ์ (เฮด)'],
-      ['69307', 'นางสาวณัฐกมล สีชมภู', 'PMD', 'ฝ่านอาคารและสถานที่'],
-      ['69308', 'นางสาวธันณธรณ์ จวงจันทร์', 'PMD', 'ฝ่ายกีฬา (เฮด)'],
-      ['69309', 'นางสาวสุพาณี ผมเหมาะ', 'PMD', 'ฝ่ายสวัสดิการ'],
-      ['69310', 'นายณัฐเศรษฐ ใจสุข', 'PMD', 'ฝ่ายโสต (เฮด)'],
-      ['69311', 'นางสาวหทัยรัตน์ ชูรักษ์', 'PMD', 'ฝ่ายประสานงาน'],
-      ['69401', 'นางสาวชนันภรณ์ เผือกผุด', 'BSC', 'อุปนายก'],
-      ['69402', 'ลาภวัต มหาวงศ์', 'BSC', 'ฝ่ายเลขานุการ'],
-      ['69403', 'นางสาวฤทัยชนก วัตนานุสิทธิ์', 'BSC', 'ฝ่ายกิจกรรม'],
-      ['69404', 'นางสาวศิริยาพร บุญมี', 'BSC', 'ฝ่ายประสานงาน'],
-      ['69405', 'นางสาวเกวลิน ฤาชา', 'BSC', 'ฝ่ายเหรัญญิก (เฮด)'],
-      ['69406', 'นางสาวบุษรากร ชูคันหอม', 'BSC', 'ฝ่ายสวัสดิการ'],
-      ['69407', 'นางสาวณัฐฐา ตราโต', 'BSC', 'ฝ่ายสวัสดิการ'],
-      ['69408', 'นางสาวชุติกาญจน์ ละกะเต็บ', 'BSC', 'ฝ่ายวิชาการ'],
-      ['69409', 'นายพิทักษ์พงศ์ สาหินกอง', 'BSC', 'ฝ่ายประชาสัมพันธ์'],
-      ['69410', 'นายคุณากร ชุมพล', 'BSC', 'ฝ่ายโสต'],
-      ['69411', 'นายธนพันธุ์ จะปะการ', 'BSC', 'ฝ่ายโสต'],
-      ['69501', 'นายกรวิชญ์ เวฬุวนารักษ์', 'TTM', 'อุปนายก'],
-      ['69502', 'นายมหรรณพ มัฆมาน', 'TTM', 'ฝ่ายเลขานุการ'],
-      ['69503', 'นางสาวศุภิสรา สุขสมบูรณ์', 'TTM', 'ฝ่ายพหุวัฒนธรรม (เฮด)'],
-      ['69504', 'นางสาวอินทุอร พึ่งบุญ ณ อยุธยา', 'TTM', 'ฝ่ายสวัสดิการ'],
-      ['69505', 'นางสาวอาลียา กาซอ', 'TTM', 'ฝ่ายกิจกรรม'],
-      ['69506', 'นางสาวบุษย์ ช่วยเกิด', 'TTM', 'ฝ่ายเหรัญญิก'],
-      ['69507', 'นายพงศ์ดนัย ราษดี', 'TTM', 'ฝ่ายประชาสัมพันธ์'],
-      ['69508', 'นายตุลวัฒน์ สุวรรณวงศ์', 'TTM', 'ฝ่ายวิชาการ'],
-      ['69509', 'นางสาวสุภารัตน์ คงมั่น', 'TTM', 'ฝ่ายพหุวัฒนธรรม'],
-      ['69510', 'นายยศกร สุภัคจารุสิทธิ์', 'TTM', 'ฝ่ายประสานงาน'],
-      ['69601', 'นางสาวจุฑามาศ องอาจ', 'DIP', 'อุปนายก'],
-      ['69602', 'นางสาวภาณุมาศ บุญนวน', 'DIP', 'สันทนาการ']
+      ['นางสาวภัทรวรินทร์ เกษมสุข', 'RT', 'นายก'],
+      ['นางสาวประภัสสร วงษ์กำภู', 'RT', 'ฝ่ายเลขานุการ (เฮด)'],
+      ['นายบดินทร์ การุณเวทย์', 'RT', 'ฝ่ายเหรัญญิก'],
+      ['นายภูมิภัทร สว่างเวียง', 'RT', 'ฝ่ายวิชาการ'],
+      ['นางสาวดอกรัก อิสระอังกูร', 'RT', 'ฝ่ายประสานงาน (เฮด)'],
+      ['นางสาวอัญญานี อาสะหนิ', 'RT', 'ฝ่ายประชาสัมพันธ์'],
+      ['นางสาวพิมพ์พันธุ์ กล่องทอง', 'RT', 'ฝ่ายกิจกรรม (เฮด)'],
+      ['นายศรัณย์ อินทรีย์', 'RT', 'ฝ่ายโสต'],
+      ['นางสาวจินตนา ศรีเริ่มสกุล', 'RT', 'ฝ่ายสถานที่ (เฮด)'],
+      ['นางสาวจุฑามณี สมบัติ', 'HCI', 'อุปนายก'],
+      ['นางสาวณัจมีย์ ปูเตะ', 'HCI', 'ฝ่ายประชาสัมพันธ์'],
+      ['นางสาวปิญชาน อุดมโภชน์', 'HCI', 'ฝ่ายเลขานุการ'],
+      ['นายคิมภกรณ์ ไชยขันธุ์', 'HCI', 'ฝ่ายโสต'],
+      ['นางสาวกุลนิษฐ์ ประดิษฐ์ธรรม', 'HCI', 'ฝ่ายเฮดวิชาการ'],
+      ['นางสาวอนัญญา ปานหงษ์', 'HCI', 'ฝ่ายประสานงาน'],
+      ['นางสาวปาลิดา โลกาวัฒนะ', 'HCI', 'ฝ่ายเฮดฝ่ายทะเบียน'],
+      ['นางสาวแวตัสนีม แวหะมุ', 'HCI', 'ฝ่ายสวัสดิการ'],
+      ['นางสาวพัทรวรรณ คำภิโล', 'HCI', 'ฝ่ายกีฬา'],
+      ['นายอนุชา รักบูรณ์', 'HCI', 'ฝ่ายเหรัญญิก'],
+      ['นายธนโชติ พันธุ์ลำเจียก', 'PMD', 'ฝ่ายอุปนายก'],
+      ['นายแทนไท พรมชาติ', 'PMD', 'ฝ่ายเลขานุการ'],
+      ['นางสาวจิรภา แดงสังวาลย์', 'PMD', 'ฝ่ายเหรัญญิก'],
+      ['นางสาวสุภัสสรา ธรรมจิตติ', 'PMD', 'ฝ่ายวิชาการ'],
+      ['นางสาวธนพร ตรีโอษฐ์', 'PMD', 'ฝ่ายประสานงาน'],
+      ['นางสาวณัฐนิชา ครุฑวิชิต', 'PMD', 'ฝ่ายประชาสัมพันธ์ (เฮด)'],
+      ['นางสาวณัฐกมล สีชมภู', 'PMD', 'ฝ่านอาคารและสถานที่'],
+      ['นางสาวธันณธรณ์ จวงจันทร์', 'PMD', 'ฝ่ายกีฬา (เฮด)'],
+      ['นางสาวสุพาณี ผมเหมาะ', 'PMD', 'ฝ่ายสวัสดิการ'],
+      ['นายณัฐเศรษฐ ใจสุข', 'PMD', 'ฝ่ายโสต (เฮด)'],
+      ['นางสาวหทัยรัตน์ ชูรักษ์', 'PMD', 'ฝ่ายประสานงาน'],
+      ['นางสาวชนันภรณ์ เผือกผุด', 'BSC', 'อุปนายก'],
+      ['ลาภวัต มหาวงศ์', 'BSC', 'ฝ่ายเลขานุการ'],
+      ['นางสาวฤทัยชนก วัตนานุสิทธิ์', 'BSC', 'ฝ่ายกิจกรรม'],
+      ['นางสาวศิริยาพร บุญมี', 'BSC', 'ฝ่ายประสานงาน'],
+      ['นางสาวเกวลิน ฤาชา', 'BSC', 'ฝ่ายเหรัญญิก (เฮด)'],
+      ['นางสาวบุษรากร ชูคันหอม', 'BSC', 'ฝ่ายสวัสดิการ'],
+      ['นางสาวณัฐฐา ตราโต', 'BSC', 'ฝ่ายสวัสดิการ'],
+      ['นางสาวชุติกาญจน์ ละกะเต็บ', 'BSC', 'ฝ่ายวิชาการ'],
+      ['นายพิทักษ์พงศ์ สาหินกอง', 'BSC', 'ฝ่ายประชาสัมพันธ์'],
+      ['นายคุณากร ชุมพล', 'BSC', 'ฝ่ายโสต'],
+      ['นายธนพันธุ์ จะปะการ', 'BSC', 'ฝ่ายโสต'],
+      ['นายกรวิชญ์ เวฬุวนารักษ์', 'TTM', 'อุปนายก'],
+      ['นายมหรรณพ มัฆมาน', 'TTM', 'ฝ่ายเลขานุการ'],
+      ['นางสาวศุภิสรา สุขสมบูรณ์', 'TTM', 'ฝ่ายพหุวัฒนธรรม (เฮด)'],
+      ['นางสาวอินทุอร พึ่งบุญ ณ อยุธยา', 'TTM', 'ฝ่ายสวัสดิการ'],
+      ['นางสาวอาลียา กาซอ', 'TTM', 'ฝ่ายกิจกรรม'],
+      ['นางสาวบุษย์ ช่วยเกิด', 'TTM', 'ฝ่ายเหรัญญิก'],
+      ['นายพงศ์ดนัย ราษดี', 'TTM', 'ฝ่ายประชาสัมพันธ์'],
+      ['นายตุลวัฒน์ สุวรรณวงศ์', 'TTM', 'ฝ่ายวิชาการ'],
+      ['นางสาวสุภารัตน์ คงมั่น', 'TTM', 'ฝ่ายพหุวัฒนธรรม'],
+      ['นายยศกร สุภัคจารุสิทธิ์', 'TTM', 'ฝ่ายประสานงาน'],
+      ['นางสาวจุฑามาศ องอาจ', 'DIP', 'อุปนายก'],
+      ['นางสาวภาณุมาศ บุญนวน', 'DIP', 'สันทนาการ']
     ];
     realStudents.forEach(row => sSheet.appendRow(row));
     formatHeaderRow(sSheet, '#1E3A8A');
@@ -128,13 +129,12 @@ function setupInitialDatabase() {
   // 4. ชีต Attendance
   const attSheet = setSheet(SHEETS.ATTENDANCE);
   if (attSheet.getLastRow() === 0) {
-    attSheet.appendRow(['session_id', 'student_id', 'status', 'checked_by', 'timestamp']);
+    attSheet.appendRow(['session_id', 'full_name', 'status', 'checked_by', 'timestamp']);
     const nowStr = Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyy-MM-dd HH:mm:ss');
-    // เช็คชื่อเริ่มต้น
-    const sampleStudents = ['69101', '69102', '69201', '69301', '69401', '69501', '69601'];
-    sampleStudents.forEach(id => {
-      attSheet.appendRow(['SESS-20260901-01', id, 'มา', 'admin01', nowStr]);
-    });
+    // เช็คชื่อตัวอย่าง 10 คนแรก
+    for (let i = 0; i < Math.min(10, realStudents.length); i++) {
+      attSheet.appendRow(['SESS-20260901-01', realStudents[i][0], 'มา', 'admin01', nowStr]);
+    }
     formatHeaderRow(attSheet, '#1E3A8A');
   }
 
@@ -151,7 +151,6 @@ function setupInitialDatabase() {
   const dashSheet = setSheet(SHEETS.DASHBOARD_SUMMARY);
   if (dashSheet.getLastRow() === 0) {
     dashSheet.appendRow([
-      'student_id',
       'full_name',
       'branch_id',
       'position',
@@ -168,7 +167,7 @@ function setupInitialDatabase() {
   // อัปเดต Summary รอบแรก
   updateDashboardSummary();
 
-  Logger.log('Setup Initial Database Completed Successfully with 53 students!');
+  Logger.log('Setup Initial Database Completed Successfully with 53 students (No student_id)!');
 }
 
 function formatHeaderRow(sheet, bgColor) {
@@ -377,10 +376,9 @@ function getStudentsData(branchFilter) {
     const row = data[i];
     if (row[0]) {
       const student = {
-        student_id: String(row[0]).trim(),
-        full_name: String(row[1]).trim(),
-        branch_id: String(row[2]).trim(),
-        position: row[3] ? String(row[3]).trim() : ''
+        full_name: String(row[0]).trim(),
+        branch_id: String(row[1]).trim(),
+        position: row[2] ? String(row[2]).trim() : ''
       };
       if (!branchFilter || branchFilter === 'ALL' || student.branch_id === branchFilter) {
         students.push(student);
@@ -425,7 +423,7 @@ function getSessionAttendanceData(sessionId) {
     if (String(row[0]).trim() === String(sessionId).trim()) {
       records.push({
         session_id: String(row[0]).trim(),
-        student_id: String(row[1]).trim(),
+        full_name: String(row[1]).trim(),
         status: String(row[2]).trim(),
         checked_by: String(row[3]).trim(),
         timestamp: String(row[4])
@@ -487,23 +485,23 @@ function saveAttendanceDraft(sessionId, records, adminId) {
     for (let i = 1; i < data.length; i++) {
       const row = data[i];
       if (String(row[0]).trim() === String(sessionId).trim()) {
-        const studentId = String(row[1]).trim();
-        existingRowMap[studentId] = i + 1;
+        const fullName = String(row[1]).trim();
+        existingRowMap[fullName] = i + 1;
       }
     }
 
     const rowsToAppend = [];
 
     records.forEach(rec => {
-      const studentId = String(rec.student_id).trim();
+      const fullName = String(rec.full_name).trim();
       const status = String(rec.status).trim();
-      if (!studentId || !status) return;
+      if (!fullName || !status) return;
 
-      if (existingRowMap[studentId]) {
-        const rowNum = existingRowMap[studentId];
+      if (existingRowMap[fullName]) {
+        const rowNum = existingRowMap[fullName];
         sheet.getRange(rowNum, 3, 1, 3).setValues([[status, checker, nowStr]]);
       } else {
-        rowsToAppend.push([sessionId, studentId, status, checker, nowStr]);
+        rowsToAppend.push([sessionId, fullName, status, checker, nowStr]);
       }
     });
 
@@ -575,8 +573,7 @@ function updateDashboardSummary() {
 
   const statsMap = {};
   students.forEach(st => {
-    statsMap[st.student_id] = {
-      student_id: st.student_id,
+    statsMap[st.full_name] = {
       full_name: st.full_name,
       branch_id: st.branch_id,
       position: st.position || '',
@@ -591,15 +588,15 @@ function updateDashboardSummary() {
   for (let i = 1; i < attData.length; i++) {
     const row = attData[i];
     const sId = String(row[0]).trim();
-    const stId = String(row[1]).trim();
+    const fullName = String(row[1]).trim();
     const status = String(row[2]).trim();
 
-    if (statsMap[stId]) {
-      statsMap[stId].total++;
-      if (status === 'มา') statsMap[stId].present++;
-      else if (status === 'สาย') statsMap[stId].late++;
-      else if (status === 'ลา') statsMap[stId].excused++;
-      else if (status === 'ขาด') statsMap[stId].absent++;
+    if (statsMap[fullName]) {
+      statsMap[fullName].total++;
+      if (status === 'มา') statsMap[fullName].present++;
+      else if (status === 'สาย') statsMap[fullName].late++;
+      else if (status === 'ลา') statsMap[fullName].excused++;
+      else if (status === 'ขาด') statsMap[fullName].absent++;
     }
   }
 
@@ -607,13 +604,12 @@ function updateDashboardSummary() {
   const rows = [];
 
   students.forEach(st => {
-    const s = statsMap[st.student_id];
+    const s = statsMap[st.full_name];
     const totalCount = s.present + s.late + s.excused + s.absent;
     const attendedCount = s.present + (s.late * 0.75);
     const rate = totalCount > 0 ? ((attendedCount / totalCount) * 100).toFixed(1) + '%' : '0%';
 
     rows.push([
-      s.student_id,
       s.full_name,
       s.branch_id,
       s.position,
@@ -631,7 +627,7 @@ function updateDashboardSummary() {
   }
 
   if (rows.length > 0) {
-    dashSheet.getRange(2, 1, rows.length, 10).setValues(rows);
+    dashSheet.getRange(2, 1, rows.length, 9).setValues(rows);
   }
 
   SpreadsheetApp.flush();
@@ -650,16 +646,15 @@ function getLeaderboard() {
     const row = data[i];
     if (row[0]) {
       students.push({
-        student_id: String(row[0]).trim(),
-        full_name: String(row[1]).trim(),
-        branch_id: String(row[2]).trim(),
-        position: String(row[3] || '').trim(),
-        present: Number(row[4]) || 0,
-        late: Number(row[5]) || 0,
-        excused: Number(row[6]) || 0,
-        absent: Number(row[7]) || 0,
-        total: Number(row[8]) || 0,
-        rate: String(row[9] || '0%')
+        full_name: String(row[0]).trim(),
+        branch_id: String(row[1]).trim(),
+        position: String(row[2] || '').trim(),
+        present: Number(row[3]) || 0,
+        late: Number(row[4]) || 0,
+        excused: Number(row[5]) || 0,
+        absent: Number(row[6]) || 0,
+        total: Number(row[7]) || 0,
+        rate: String(row[8] || '0%')
       });
     }
   }
@@ -691,28 +686,27 @@ function getDashboard(filterBranch) {
   for (let i = 1; i < freshData.length; i++) {
     const row = freshData[i];
     if (row[0]) {
-      const branchId = String(row[2]).trim();
+      const branchId = String(row[1]).trim();
       if (!filterBranch || filterBranch === 'ALL' || branchId === filterBranch) {
-        const p = Number(row[4]) || 0;
-        const l = Number(row[5]) || 0;
-        const e = Number(row[6]) || 0;
-        const a = Number(row[7]) || 0;
+        const p = Number(row[3]) || 0;
+        const l = Number(row[4]) || 0;
+        const e = Number(row[5]) || 0;
+        const a = Number(row[6]) || 0;
         totalPresent += p;
         totalLate += l;
         totalExcused += e;
         totalAbsent += a;
 
         list.push({
-          student_id: String(row[0]).trim(),
-          full_name: String(row[1]).trim(),
+          full_name: String(row[0]).trim(),
           branch_id: branchId,
-          position: String(row[3] || '').trim(),
+          position: String(row[2] || '').trim(),
           present: p,
           late: l,
           excused: e,
           absent: a,
-          total: Number(row[8]) || 0,
-          rate: String(row[9] || '0%')
+          total: Number(row[7]) || 0,
+          rate: String(row[8] || '0%')
         });
       }
     }

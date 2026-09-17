@@ -135,13 +135,12 @@ const Dashboard = {
 
     tbody.innerHTML = '';
     students.forEach((st, idx) => {
-      const currentStatus = map[st.student_id] || '';
+      const currentStatus = map[st.full_name] || map[st.student_id] || '';
       const branch = this.branches.find(b => b.branch_id === st.branch_id) || { branch_name: st.branch_id, color_hex: '#6B7280' };
 
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td class="text-center font-mono text-muted">${idx + 1}</td>
-        <td class="font-mono font-semibold">${st.student_id}</td>
         <td>
           <div class="name-box">
             <span class="student-name">${st.full_name}</span>
@@ -177,7 +176,7 @@ const Dashboard = {
             <div class="rank-badge" style="background-color: ${rankColors[i] || '#64748B'}">${i + 1}</div>
             <div class="leaderboard-info">
               <div class="leaderboard-name">${st.full_name}</div>
-              <div class="leaderboard-sub text-muted font-mono">${st.student_id} • สาขา ${st.branch_id}</div>
+              <div class="leaderboard-sub text-muted font-mono">สาขา ${st.branch_id} ${st.position ? `• ${st.position}` : ''}</div>
             </div>
             <div class="leaderboard-score text-success font-semibold">
               ${st.present + st.late} ครั้ง <span class="rate-badge">(${st.rate})</span>
@@ -202,7 +201,7 @@ const Dashboard = {
             <div class="rank-badge rank-absent">${i + 1}</div>
             <div class="leaderboard-info">
               <div class="leaderboard-name">${st.full_name}</div>
-              <div class="leaderboard-sub text-muted font-mono">${st.student_id} • สาขา ${st.branch_id}</div>
+              <div class="leaderboard-sub text-muted font-mono">สาขา ${st.branch_id} ${st.position ? `• ${st.position}` : ''}</div>
             </div>
             <div class="leaderboard-score text-danger font-semibold">
               ${st.absent} ครั้ง
@@ -247,7 +246,6 @@ const Dashboard = {
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td class="text-center font-mono">${idx + 1}</td>
-        <td class="font-mono font-semibold">${st.student_id}</td>
         <td>
           <div class="name-box">
             <span class="student-name">${st.full_name}</span>
