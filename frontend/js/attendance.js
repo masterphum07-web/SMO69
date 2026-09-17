@@ -238,6 +238,36 @@ const Attendance = {
     }
   },
 
+  async syncReportToSheets(e) {
+    if (!this.currentSessionId) {
+      alert('⚠️ กรุณาเลือกองค์ประชุมด้านบนก่อน เพื่อสร้างหรืออัปเดตรายงานผลขององค์ประชุมนั้นลงใน Google Sheets ครับ');
+      return;
+    }
+    const btn = (e && e.target) ? e.target : null;
+    const oldText = btn ? btn.textContent : '';
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = '⏳ กำลังส่งคำสั่งไป Google Sheet...';
+    }
+    try {
+      // บันทึกสถานะล่าสุดก่อน
+      await this.saveDraft(false);
+      const res = await Api.requestGet('generateReport', { sessionId: this.currentSessionId });
+      if (res && res.success) {
+        alert('✅ อัปเดตแท็บ "บันทึกผลการเช็คชื่อ" ใน Google Sheets สำเร็จเรียบร้อยแล้ว!\nคุณสามารถเปิดดูแถบนี้ใน Google Sheets ได้ทันที');
+      } else {
+        alert('⚠️ ระบบบันทึกผลเรียบร้อยแล้ว หากยังไม่เห็นแท็บ กรุณาเปิด Google Sheets แล้วกดรีเฟรช (F5) ครับ');
+      }
+    } catch (err) {
+      alert('⚠️ เกิดข้อผิดพลาด: ' + err.message);
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = oldText || '📊 อัปเดตชีตรายงานผล (Google Sheet)';
+      }
+    }
+  },
+
   async submitSession() {
     if (!this.currentSessionId || !this.currentSession) {
       alert('⚠️ ไม่พบองค์ประชุม กรุณาเลือกหรือสร้างองค์ประชุมก่อน');

@@ -18,12 +18,92 @@ const SHEETS = {
 };
 
 /**
- * ฟังก์ชันเลือกหรือสร้างชีตตามชื่อ (บังคับต้องมีตามสเปก)
+ * =========================================================================
+ * 🚀 ฟังก์ชันหลักสำหรับกดปุ่ม "เรียกใช้ (Run)":
+ * 1. ใน Google Apps Script ให้เลือกฟังก์ชัน "createReportSheetNow" ในเมนู Dropdown ด้านบน
+ * 2. กดปุ่ม "เรียกใช้ (Run)"
+ * 3. ระบบจะสร้างแท็บ "บันทึกผลการเช็คชื่อ" พร้อมรายชื่อ 53 คน และสีไฮไลต์อย่างเป็นทางการทันที!
+ * =========================================================================
+ */
+function createReportSheetNow() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) {
+    throw new Error('ไม่พบ Google Spreadsheet กรุณาเปิด Apps Script จากเมนู "ส่วนขยาย (Extensions)" > "Apps Script" ภายใน Google Sheet');
+  }
+
+  // 1. ตรวจสอบ/เตรียมชีต Branches (6 สาขา)
+  const bSheet = ss.getSheetByName(SHEETS.BRANCHES);
+  if (!bSheet || bSheet.getLastRow() <= 1) {
+    updateBranchesOnly();
+  }
+
+  // 2. ตรวจสอบ/เตรียมชีต Students (53 คน)
+  const sSheet = ss.getSheetByName(SHEETS.STUDENTS);
+  if (!sSheet || sSheet.getLastRow() <= 1) {
+    updateStudentsOnly();
+  }
+
+  // 3. ตรวจสอบชีต Sessions
+  const sessSheet = setSheet(SHEETS.SESSIONS);
+  if (sessSheet.getLastRow() === 0) {
+    sessSheet.appendRow(['session_id', 'session_title', 'session_date', 'branch_scope', 'status', 'created_by', 'created_at']);
+    formatHeaderRow(sessSheet, '#0F2F57');
+  }
+
+  // 4. ตรวจสอบชีต Attendance
+  const attSheet = setSheet(SHEETS.ATTENDANCE);
+  if (attSheet.getLastRow() === 0) {
+    attSheet.appendRow(['session_id', 'full_name', 'status', 'checked_by', 'timestamp']);
+    formatHeaderRow(attSheet, '#0F2F57');
+  }
+
+  // 5. สร้างหรืออัปเดตแท็บรายงานผล
+  if (sessSheet.getLastRow() > 1) {
+    generateLatestSessionReport();
+  } else {
+    setupSessionReportTemplate();
+  }
+
+  // สลับหน้าจอมาที่แท็บรายงานผลทันที
+  const reportSheet = ss.getSheetByName(SHEETS.SESSION_REPORT);
+  if (reportSheet) {
+    try {
+      ss.setActiveSheet(reportSheet);
+    } catch (e) {}
+  }
+
+  try {
+    ss.toast('✅ สร้างแท็บ "บันทึกผลการเช็คชื่อ" พร้อมรายชื่อ 53 คนและสีไฮไลต์เรียบร้อยแล้ว!', 'SMO 69 ระบบเช็คชื่อ', 8);
+  } catch (e) {}
+
+  Logger.log('===========================================================');
+  Logger.log('✅ สร้างแท็บ "บันทึกผลการเช็คชื่อ" สำเร็จเรียบร้อยแล้ว!');
+  Logger.log('👉 กลับไปดูที่หน้า Google Sheets จะเห็นแท็บใหม่ทันที');
+  Logger.log('===========================================================');
+
+  return 'SUCCESS';
+}
+
+/**
+ * ฟังก์ชันภาษาไทย สำรองไว้สำหรับผู้ที่สะดวกเลือกเมนูภาษาไทยใน Apps Script
+ */
+function สร้างแท็บบันทึกผลการเช็คชื่อ() {
+  return createReportSheetNow();
+}
+
+/**
+ * ฟังก์ชันเลือกหรือสร้างชีตตามชื่อ (ปลอดภัย: หากไม่ระบุชื่อจะสร้างแท็บบันทึกผลทันที)
  * @param {string} sheetName - ชื่อชีตที่ต้องการเข้าถึง
  * @returns {GoogleAppsScript.Spreadsheet.Sheet}
  */
 function setSheet(sheetName) {
+  if (!sheetName || typeof sheetName !== 'string') {
+    sheetName = SHEETS.SESSION_REPORT;
+  }
   const ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) {
+    throw new Error('ไม่พบ Google Spreadsheet กรุณาเปิด Apps Script จากเมนู "ส่วนขยาย" > "Apps Script" ภายใน Google Sheet');
+  }
   let sheet = ss.getSheetByName(sheetName);
   if (!sheet) {
     sheet = ss.insertSheet(sheetName);
@@ -217,6 +297,20 @@ function doGet(e) {
   try {
     const action = (e && e.parameter && e.parameter.action) ? e.parameter.action : '';
     let result = { success: false, message: 'Action not specified' };
+
+    if (!action) {
+      // หากกดปุ่ม "เรียกใช้ (Run)" บนฟังก์ชัน doGet โดดๆ หรือเปิด URL ตรงๆ ให้สร้างแท็บรายงานผลทันที
+      try {
+        createReportSheetNow();
+        result = {
+          success: true,
+          message: 'SMO69 Attendance API is online & สร้างแท็บ "บันทึกผลการเช็คชื่อ" เรียบร้อยแล้ว'
+        };
+      } catch (ex) {
+        result = { success: true, message: 'SMO69 Attendance API is online', note: ex.toString() };
+      }
+      return createJsonResponse(result, e);
+    }
 
     switch (action) {
       case 'ping':
@@ -852,19 +946,22 @@ function setupSessionReportTemplate() {
   headerRange.setVerticalAlignment('middle');
   sheet.setRowHeight(5, 28);
 
-  const students = getStudentsData();
-  if (students.length > 0) {
-    const attMap = {};
-    const stats = { present: 0, late: 0, excused: 0, absent: 0, pending: students.length, rate: '0%' };
-    const dummySession = {
-      title: 'รอการเปิดรอบเช็คชื่อ',
-      date: Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyy-MM-dd'),
-      scope: 'ALL',
-      sessionId: 'WAITING',
-      status: 'waiting'
-    };
-    renderReportToSheet(sheet, dummySession, students, attMap, stats);
+  let students = getStudentsData();
+  if (!students || students.length === 0) {
+    updateStudentsOnly();
+    students = getStudentsData();
   }
+  
+  const attMap = {};
+  const stats = { present: 0, late: 0, excused: 0, absent: 0, pending: (students ? students.length : 0), rate: '0%' };
+  const dummySession = {
+    title: 'พร้อมบันทึกผลการเช็คชื่อ',
+    date: Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyy-MM-dd'),
+    scope: 'ALL',
+    sessionId: 'READY',
+    status: 'ready'
+  };
+  renderReportToSheet(sheet, dummySession, students || [], attMap, stats);
 }
 
 /**
@@ -918,7 +1015,11 @@ function generateSessionReport(sessionId) {
     return { success: false, error: 'ไม่พบองค์ประชุม ID: ' + sessionId };
   }
 
-  const students = getStudentsData();
+  let students = getStudentsData();
+  if (!students || students.length === 0) {
+    updateStudentsOnly();
+    students = getStudentsData();
+  }
   const attData = getSessionAttendanceData(sessionId);
   const attMap = {};
   attData.forEach(rec => {
@@ -1149,18 +1250,30 @@ function renderReportToSheet(sheet, session, students, attMap, stats) {
     ]);
   });
 
-  const dataRange = sheet.getRange(6, 1, values.length, 6);
-  dataRange.setValues(values);
-  dataRange.setBackgrounds(backgrounds);
-  dataRange.setFontColors(fontColors);
-  dataRange.setFontWeights(fontWeights);
-  dataRange.setHorizontalAlignments(alignments);
-  dataRange.setVerticalAlignment('middle');
-  dataRange.setFontSize(9);
+  if (values.length > 0) {
+    const dataRange = sheet.getRange(6, 1, values.length, 6);
+    dataRange.setValues(values);
+    dataRange.setBackgrounds(backgrounds);
+    dataRange.setFontColors(fontColors);
+    dataRange.setFontWeights(fontWeights);
+    dataRange.setHorizontalAlignments(alignments);
+    dataRange.setVerticalAlignment('middle');
+    dataRange.setFontSize(9);
 
-  // ตั้งค่าความสูงแถว
-  for (let r = 0; r < values.length; r++) {
-    sheet.setRowHeight(6 + r, 24);
+    // ตั้งค่าความสูงแถว
+    for (let r = 0; r < values.length; r++) {
+      sheet.setRowHeight(6 + r, 24);
+    }
+
+    // ใส่เส้นขอบตาราง (Borders)
+    const fullTableRange = sheet.getRange(5, 1, values.length + 1, 6);
+    try {
+      fullTableRange.setBorder(true, true, true, true, true, true, '#CBD5E1', SpreadsheetApp.BorderStyle.SOLID);
+    } catch (e) {
+      try {
+        fullTableRange.setBorder(true, true, true, true, true, true);
+      } catch (e2) {}
+    }
   }
 
   // กำหนดความกว้างคอลัมน์ให้อ่านง่าย พอดีกับข้อความ
@@ -1171,12 +1284,17 @@ function renderReportToSheet(sheet, session, students, attMap, stats) {
   sheet.setColumnWidth(5, 140);  // สถานะการเข้าร่วม (พร้อมไฮไลต์)
   sheet.setColumnWidth(6, 170);  // วันเวลาที่บันทึก
 
-  // ใส่เส้นขอบตาราง (Borders)
-  const fullTableRange = sheet.getRange(5, 1, values.length + 1, 6);
-  fullTableRange.setBorder(true, true, true, true, true, true, '#CBD5E1', SpreadsheetApp.BorderStyle.SOLID);
-
   // ตรึงแถวที่ 1-5 ไว้ด้านบนเสมอ
-  sheet.setFrozenRows(5);
+  try {
+    sheet.setFrozenRows(5);
+  } catch (e) {}
+
+  // สลับหน้าจอมาที่ชีตนี้ทันทีเพื่อให้ผู้ใช้เห็น
+  try {
+    sheet.activate();
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (ss) ss.setActiveSheet(sheet);
+  } catch (e) {}
 }
 
 /**
@@ -1186,7 +1304,7 @@ function onOpen() {
   try {
     const ui = SpreadsheetApp.getUi();
     ui.createMenu('📋 ระบบเช็คชื่อ SMO 69')
-      .addItem('📊 สร้าง/อัปเดตแท็บรายงานผล (องค์ประชุมล่าสุด)', 'generateLatestSessionReport')
+      .addItem('📊 สร้าง/อัปเดตแท็บรายงานผล (กดสร้างทันที)', 'createReportSheetNow')
       .addSeparator()
       .addItem('⚡ อัปเดตชีต Branches (6 สาขา)', 'updateBranchesOnly')
       .addItem('👥 อัปเดตชีต Students (53 คน)', 'updateStudentsOnly')
