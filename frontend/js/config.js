@@ -9,16 +9,18 @@ const CONFIG_KEYS = {
   POLL_INTERVAL: 'smo69_poll_interval'
 };
 
+// URL ที่ผู้ใช้ Deploy จาก Google Sheets
+const BUILTIN_API_URL = 'https://script.google.com/macros/s/AKfycbzSUwpiZQqSBzYmmc7Wezv5qWVd5bwu3JdkGwrKYajc_ye48iOMKaOG7fwAsOU5ZKw/exec';
+
 const DEFAULT_CONFIG = {
-  // ค่าเริ่มต้น หากยังไม่ได้ใส่ URL สามารถทดสอบผ่านระบบ Mock ได้ทันที
-  apiUrl: localStorage.getItem(CONFIG_KEYS.API_URL) || '',
-  useMock: localStorage.getItem(CONFIG_KEYS.USE_MOCK) !== 'false', // ค่าเริ่มต้นเป็น true จนกว่าจะตั้ง URL จริง
-  pollInterval: parseInt(localStorage.getItem(CONFIG_KEYS.POLL_INTERVAL), 10) || 8000 // 8 วินาทีตามสเปก 5-10 วิ
+  apiUrl: localStorage.getItem(CONFIG_KEYS.API_URL) || BUILTIN_API_URL,
+  useMock: localStorage.getItem(CONFIG_KEYS.USE_MOCK) === 'true',
+  pollInterval: parseInt(localStorage.getItem(CONFIG_KEYS.POLL_INTERVAL), 10) || 8000
 };
 
 const Config = {
   getApiUrl() {
-    return localStorage.getItem(CONFIG_KEYS.API_URL) || '';
+    return localStorage.getItem(CONFIG_KEYS.API_URL) || BUILTIN_API_URL;
   },
 
   setApiUrl(url) {
@@ -29,9 +31,12 @@ const Config = {
   },
 
   isMockMode() {
-    const url = this.getApiUrl();
-    if (!url) return true;
-    return localStorage.getItem(CONFIG_KEYS.USE_MOCK) === 'true';
+    const custom = localStorage.getItem(CONFIG_KEYS.USE_MOCK);
+    if (custom !== null) {
+      return custom === 'true';
+    }
+    // มี Built-in URL ให้เริ่มต้นที่โหมดเชื่อมต่อ Google Sheets จริง
+    return false;
   },
 
   setMockMode(val) {
