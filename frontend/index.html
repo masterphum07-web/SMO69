@@ -12,6 +12,9 @@
 
   <link rel="stylesheet" href="css/style.css">
   <link rel="icon" type="image/png" href="assets/logo.png">
+  
+  <!-- Chart.js 4.4 CDN for Interactive Dashboard Graphs -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </head>
 <body>
 
@@ -285,6 +288,71 @@
         <div class="stat-card card-total">
           <div class="stat-label">จำนวนนักศึกษาในระบบ</div>
           <div id="admin-stat-total-students" class="stat-value">0</div>
+        </div>
+      </div>
+
+      <!-- ================= CHARTS SECTION ================= -->
+      <div class="charts-grid">
+        <!-- Chart 1: Donut สัดส่วนสถานะการเข้าร่วมทั้งหมด -->
+        <div class="content-card chart-card">
+          <div class="card-header-flex">
+            <div>
+              <h3>📊 สัดส่วนสถานะการเข้าร่วมทั้งหมด</h3>
+              <div class="text-xs text-muted">สรุปสัดส่วน มา, สาย, ลา, ขาด สะสมจากทุกองค์ประชุม</div>
+            </div>
+            <span class="badge-pill">ภาพรวมสโมสร</span>
+          </div>
+          <div class="chart-container-wrapper" style="height: 270px;">
+            <canvas id="chart-attendance-pie"></canvas>
+            <div id="chart-pie-center" class="chart-center-metric">
+              <div id="chart-pie-rate" class="chart-center-val">0%</div>
+              <div class="chart-center-lbl">เข้าร่วมสุทธิ</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chart 2: แท่งซ้อน แยกตาม 6 สาขาวิชา -->
+        <div class="content-card chart-card">
+          <div class="card-header-flex">
+            <div>
+              <h3>🏛️ เปรียบเทียบสถิติแยกตามสาขาวิชา (6 สาขา)</h3>
+              <div class="text-xs text-muted">เปรียบเทียบยอด มา สาย ลา ขาด ของแต่ละสาขาวิชา</div>
+            </div>
+            <span class="badge-pill">เปรียบเทียบสาขา</span>
+          </div>
+          <div class="chart-container-wrapper" style="height: 270px;">
+            <canvas id="chart-branch-bar"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="charts-grid">
+        <!-- Chart 3: การกระจายตัวตามเกณฑ์ % การเข้าร่วม -->
+        <div class="content-card chart-card">
+          <div class="card-header-flex">
+            <div>
+              <h3>🎯 การกระจายตัวตามเกณฑ์การเข้าร่วม (53 คน)</h3>
+              <div class="text-xs text-muted">จำแนกสมาชิกตามระดับเปอร์เซ็นต์การเข้าประชุมรายบุคคล</div>
+            </div>
+            <span class="badge-pill">เกณฑ์รายบุคคล</span>
+          </div>
+          <div class="chart-container-wrapper" style="height: 240px;">
+            <canvas id="chart-rate-tier"></canvas>
+          </div>
+        </div>
+
+        <!-- Chart 4: แนวโน้มอัตราการเข้าร่วมแต่ละองค์ประชุม -->
+        <div class="content-card chart-card">
+          <div class="card-header-flex">
+            <div>
+              <h3>📈 อัตราการเข้าร่วมในแต่ละองค์ประชุม</h3>
+              <div class="text-xs text-muted">ติดตาม % ความพร้อมเพรียงในแต่ละวาระการประชุม</div>
+            </div>
+            <span class="badge-pill">ไทม์ไลน์วาระ</span>
+          </div>
+          <div class="chart-container-wrapper" style="height: 240px;">
+            <canvas id="chart-session-trend"></canvas>
+          </div>
         </div>
       </div>
 
