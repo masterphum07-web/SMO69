@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ระบบเช็คชื่อสโมสรนักศึกษาปี 69 | วิทยาลัยเทคโนโลยีทางการแพทย์และสาธารณสุข กาญจนาภิเษก</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📋</text></svg>">
+</head>
+<body>
+
+  <!-- ================= HEADER ================= -->
+  <header class="site-header">
+    <div class="header-container">
+      <div class="brand-section">
+        <div class="brand-logo-badge">วทก.</div>
+        <div class="brand-titles">
+          <h1>ระบบเช็คชื่อสโมสรนักศึกษาปี 69</h1>
+          <div class="subtitle">วิทยาลัยเทคโนโลยีทางการแพทย์และสาธารณสุข กาญจนาภิเษก</div>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <!-- Badge สถานะการเชื่อมต่อ -->
+        <div id="api-status-badge" class="api-status-badge" onclick="App.openSettingsModal()" title="คลิกเพื่อตั้งค่าการเชื่อมต่อ Google Sheets">
+          <span class="status-indicator warning"></span>
+          <span>โหมดจำลอง (Mock DB)</span>
+        </div>
+
+        <!-- กล่องสำหรับผู้ใช้งานทั่วไป (ยังไม่ล็อกอิน) -->
+        <div id="auth-guest-box">
+          <button class="btn-primary btn-sm" onclick="App.openLoginModal()">
+            🔑 เข้าสู่ระบบแอดมิน / ผู้เช็คชื่อ
+          </button>
+        </div>
+
+        <!-- กล่องสำหรับผู้ที่ล็อกอินแล้ว -->
+        <div id="auth-user-box" style="display: none; align-items: center; gap: 0.6rem;">
+          <span id="auth-user-role" class="role-badge role-admin">แอดมิน</span>
+          <span id="auth-user-name" class="font-semibold text-sm">ผู้ใช้งาน</span>
+          <button class="btn-outline btn-sm" onclick="Auth.logout()">ออกจากระบบ</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ================= NAVIGATION TABS ================= -->
+  <nav class="nav-bar">
+    <div class="nav-container">
+      <button class="nav-tab active" data-tab="public">
+        <span>📊</span> ภาพรวม & Leaderboard (สาธารณะ)
+      </button>
+      <button id="nav-tab-attendance" class="nav-tab locked" data-tab="attendance">
+        <span>✍️</span> เช็คชื่อองค์ประชุม (สำหรับผู้เช็คชื่อ)
+      </button>
+      <button id="nav-tab-admin" class="nav-tab" data-tab="admin" style="display: none;">
+        <span>📈</span> แดชบอร์ดสรุปผล (สำหรับแอดมิน)
+      </button>
+    </div>
+  </nav>
+
+  <!-- ================= MAIN CONTENT AREA ================= -->
+  <main class="main-wrapper">
+
+    <!-- TAB 1: PUBLIC STATS & LEADERBOARD -->
+    <section id="tab-public" class="tab-pane active">
+      <!-- Session Banner ล่าสุด -->
+      <div class="session-banner">
+        <div>
+          <div class="text-xs text-muted font-semibold" style="text-transform: uppercase; letter-spacing: 0.05em;">องค์ประชุมล่าสุด</div>
+          <h2 id="public-session-title" style="font-size: 1.3rem; margin: 0.2rem 0;">กำลังโหลดข้อมูล...</h2>
+          <div id="public-session-date" class="text-sm text-muted"></div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+          <span id="public-session-badge" class="status-badge status-late">กำลังเช็คชื่อ</span>
+          <div id="public-poll-indicator" class="text-xs text-muted">
+            <span class="pulse-dot active"></span> เรียลไทม์ (Auto Sync)
+          </div>
+        </div>
+      </div>
+
+      <!-- Stat Cards -->
+      <div class="stats-grid">
+        <div class="stat-card card-present">
+          <div class="stat-label">เข้าร่วม (มา)</div>
+          <div id="pub-stat-present" class="stat-value">0</div>
+        </div>
+        <div class="stat-card card-late">
+          <div class="stat-label">มาสาย</div>
+          <div id="pub-stat-late" class="stat-value">0</div>
+        </div>
+        <div class="stat-card card-excused">
+          <div class="stat-label">ขอลา</div>
+          <div id="pub-stat-excused" class="stat-value">0</div>
+        </div>
+        <div class="stat-card card-absent">
+          <div class="stat-label">ขาดกิจกรรม</div>
+          <div id="pub-stat-absent" class="stat-value">0</div>
+        </div>
+        <div class="stat-card card-pending">
+          <div class="stat-label">ยังไม่เช็ค</div>
+          <div id="pub-stat-pending" class="stat-value">0</div>
+        </div>
+        <div class="stat-card card-total">
+          <div class="stat-label">สมาชิกทั้งหมด</div>
+          <div id="pub-stat-total" class="stat-value">0</div>
+        </div>
+      </div>
+
+      <!-- Leaderboard Section -->
+      <div class="leaderboard-grid">
+        <div class="leaderboard-card">
+          <div class="leaderboard-title text-success">
+            <span>🏆</span> 5 อันดับ เข้าร่วมกิจกรรมมากที่สุด (รวมทั้งเทอม)
+          </div>
+          <ul id="leaderboard-top-present" class="leaderboard-list">
+            <li class="empty-text">กำลังโหลดข้อมูล...</li>
+          </ul>
+        </div>
+
+        <div class="leaderboard-card">
+          <div class="leaderboard-title text-danger">
+            <span>⚠️</span> 5 อันดับ ขาดกิจกรรมมากที่สุด (รวมทั้งเทอม)
+          </div>
+          <ul id="leaderboard-top-absent" class="leaderboard-list">
+            <li class="empty-text">กำลังโหลดข้อมูล...</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- รายชื่อการเช็คชื่อแบบเรียลไทม์ -->
+      <div class="content-card" style="margin-top: 1.5rem;">
+        <div class="card-header-flex">
+          <h3>รายชื่อและการเข้าร่วมในองค์ประชุมนี้</h3>
+          <button class="btn-outline btn-sm" onclick="Dashboard.loadPublicStats()">
+            🔄 รีเฟรชข้อมูล
+          </button>
+        </div>
+
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width: 60px;" class="text-center">ลำดับ</th>
+                <th style="width: 130px;">รหัสนักศึกษา</th>
+                <th>ชื่อ - นามสกุล / สาขาวิชา</th>
+                <th style="width: 140px;" class="text-center">สถานะการเช็ค</th>
+              </tr>
+            </thead>
+            <tbody id="public-attendance-tbody">
+              <tr><td colspan="4" class="text-center text-muted" style="padding: 2rem;">กำลังโหลดข้อมูลรายชื่อ...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: ATTENDANCE CHECKING (FOR CHECKER & ADMIN) -->
+    <section id="tab-attendance" class="tab-pane">
+      <div class="content-card">
+        <!-- Session Selector & Actions -->
+        <div class="card-header-flex">
+          <div style="flex: 1; min-width: 260px;">
+            <label class="text-xs font-semibold text-muted" for="session-select">เลือกองค์ประชุม / วาระการเช็คชื่อ:</label>
+            <div style="display: flex; gap: 0.5rem; margin-top: 0.25rem;">
+              <select id="session-select" class="select-custom" style="flex: 1;">
+                <option>กำลังโหลดรายการ...</option>
+              </select>
+              <button class="btn-primary" onclick="App.openNewSessionModal()">
+                + สร้างองค์ประชุมใหม่
+              </button>
+            </div>
+          </div>
+
+          <div style="text-align: right;">
+            <div id="draft-status-indicator" class="status-text saved">
+              ✓ ข้อมูลพร้อมบันทึก
+            </div>
+          </div>
+        </div>
+
+        <!-- Filter & Search Controls -->
+        <div class="controls-bar">
+          <div id="branch-filter-container" class="branch-filter-group" style="margin-bottom: 0;">
+            <!-- Rendered by JS -->
+          </div>
+          <input type="text" id="attendance-search" class="search-input" placeholder="🔍 ค้นหาด้วยชื่อ หรือ รหัสนักศึกษา...">
+        </div>
+
+        <!-- Quick Counters & Quick Actions -->
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; background: #F8FAFC; padding: 0.75rem 1rem; border-radius: var(--radius-md); margin-bottom: 1rem; border: 1px solid var(--border-color);">
+          <div class="text-sm font-semibold" style="display: flex; gap: 1rem; flex-wrap: wrap;">
+            <span>มา: <b id="count-present" class="text-success">0</b></span>
+            <span>สาย: <b id="count-late" class="text-warning">0</b></span>
+            <span>ลา: <b id="count-excused" class="text-primary">0</b></span>
+            <span>ขาด: <b id="count-absent" class="text-danger">0</b></span>
+            <span>ยังไม่เช็ค: <b id="count-pending" class="text-muted">0</b></span>
+            <span>รวม: <b id="count-total">0</b> คน</span>
+          </div>
+
+          <div style="display: flex; gap: 0.5rem;">
+            <button class="btn-outline btn-sm" onclick="Attendance.markAllAs('มา')">
+              ✓ เช็ค "มา" ทุกคนที่แสดง
+            </button>
+            <button class="btn-outline btn-sm text-danger" onclick="Attendance.clearCurrentFilters()">
+              ล้างสถานะ
+            </button>
+          </div>
+        </div>
+
+        <!-- Attendance Sheet Table -->
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width: 50px;" class="text-center">#</th>
+                <th style="width: 120px;">รหัสนักศึกษา</th>
+                <th>ชื่อ - นามสกุล / สาขาวิชา</th>
+                <th style="width: 130px;" class="text-center">สถานะปัจจุบัน</th>
+                <th style="width: 280px;" class="text-center">กดบันทึกสถานะ</th>
+              </tr>
+            </thead>
+            <tbody id="attendance-table-body">
+              <tr><td colspan="5" class="text-center text-muted" style="padding: 2rem;">กำลังโหลดข้อมูล...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Bottom Action Buttons -->
+        <div style="display: flex; justify-content: flex-end; align-items: center; gap: 1rem; margin-top: 1.5rem; border-top: 1px solid var(--border-color); padding-top: 1.25rem;">
+          <button class="btn-outline" onclick="Attendance.saveDraft(true)">
+            💾 บันทึกร่าง (Save Draft)
+          </button>
+          <button class="btn-success" onclick="Attendance.submitSession()">
+            🚀 ยืนยันและส่งสรุปผล (Submit)
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: ADMIN DASHBOARD -->
+    <section id="tab-admin" class="tab-pane">
+      <!-- Admin Stats Overview -->
+      <div class="stats-grid">
+        <div class="stat-card card-present">
+          <div class="stat-label">ยอดมาสะสมทั้งหมด</div>
+          <div id="admin-stat-present" class="stat-value">0</div>
+        </div>
+        <div class="stat-card card-late">
+          <div class="stat-label">ยอดสายสะสม</div>
+          <div id="admin-stat-late" class="stat-value">0</div>
+        </div>
+        <div class="stat-card card-excused">
+          <div class="stat-label">ยอดลาสะสม</div>
+          <div id="admin-stat-excused" class="stat-value">0</div>
+        </div>
+        <div class="stat-card card-absent">
+          <div class="stat-label">ยอดขาดสะสม</div>
+          <div id="admin-stat-absent" class="stat-value">0</div>
+        </div>
+        <div class="stat-card card-total">
+          <div class="stat-label">จำนวนนักศึกษาในระบบ</div>
+          <div id="admin-stat-total-students" class="stat-value">0</div>
+        </div>
+      </div>
+
+      <!-- Student Summary Table -->
+      <div class="content-card">
+        <div class="card-header-flex">
+          <div>
+            <h3>ตารางสรุปการเข้าร่วมกิจกรรมรายบุคคล</h3>
+            <div class="text-xs text-muted">ข้อมูลคำนวณอัตโนมัติจากทุกองค์ประชุมที่ส่งสรุปผลแล้ว</div>
+          </div>
+          <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <select id="admin-branch-filter" class="select-custom text-sm">
+              <option value="ALL">ทุกสาขาวิชา</option>
+              <option value="RT01">รังสีเทคนิค</option>
+              <option value="PH01">สาธารณสุขชุมชน</option>
+              <option value="DT01">ทันตสาธารณสุข</option>
+            </select>
+            <button class="btn-outline btn-sm" onclick="Dashboard.exportToCSV()">
+              📥 ส่งออกเป็น Excel (CSV)
+            </button>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table id="admin-summary-table" class="data-table">
+            <thead>
+              <tr>
+                <th style="width: 50px;" class="text-center">ลำดับ</th>
+                <th style="width: 120px;">รหัสนักศึกษา</th>
+                <th>ชื่อ - นามสกุล</th>
+                <th style="width: 75px;" class="text-center">มา</th>
+                <th style="width: 75px;" class="text-center">สาย</th>
+                <th style="width: 75px;" class="text-center">ลา</th>
+                <th style="width: 75px;" class="text-center">ขาด</th>
+                <th style="width: 80px;" class="text-center">รวมครั้ง</th>
+                <th style="width: 110px;" class="text-center">% การเข้า</th>
+              </tr>
+            </thead>
+            <tbody id="admin-summary-tbody">
+              <!-- Rendered by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Sessions History -->
+      <div class="content-card">
+        <div class="card-header-flex">
+          <h3>ประวัติองค์ประชุมทั้งหมด</h3>
+        </div>
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width: 150px;">รหัสองค์ประชุม</th>
+                <th>หัวข้อ / วาระการประชุม</th>
+                <th style="width: 110px;">วันที่</th>
+                <th style="width: 110px;" class="text-center">กลุ่มเป้าหมาย</th>
+                <th style="width: 120px;" class="text-center">สถานะ</th>
+                <th style="width: 120px;" class="text-center">จัดการ</th>
+              </tr>
+            </thead>
+            <tbody id="admin-sessions-history-tbody">
+              <!-- Rendered by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ================= FOOTER ================= -->
+  <footer class="site-footer">
+    <p>ระบบเช็คชื่อสโมสรนักศึกษาปีการศึกษา 2569 • วิทยาลัยเทคโนโลยีทางการแพทย์และสาธารณสุข กาญจนาภิเษก</p>
+    <p class="text-xs text-muted" style="margin-top: 0.35rem;">เชื่อมต่อฐานข้อมูล Google Sheets ผ่าน Google Apps Script Web App API</p>
+  </footer>
+
+  <!-- ================= MODAL: LOGIN ================= -->
+  <div id="login-modal" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>เข้าสู่ระบบผู้เช็คชื่อ / แอดมิน</h3>
+        <button class="btn-close" onclick="App.closeModal('login-modal')">&times;</button>
+      </div>
+      <form id="login-form">
+        <div class="form-group">
+          <label for="login-admin-id">รหัสผู้ใช้งาน (Admin ID):</label>
+          <input type="text" id="login-admin-id" class="form-input" placeholder="เช่น admin01 หรือ checker01" required>
+        </div>
+        <div class="form-group">
+          <label for="login-pin">รหัส PIN เข้าใช้งาน:</label>
+          <input type="password" id="login-pin" class="form-input" placeholder="รหัส PIN 4 หลัก" required maxlength="10">
+        </div>
+        <div id="login-error-msg" class="text-danger text-sm" style="display: none; margin-bottom: 1rem;"></div>
+        <div style="background: #F8FAFC; border: 1px solid var(--border-color); padding: 0.65rem 0.85rem; border-radius: var(--radius-sm); font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">
+          💡 <b>รหัสทดสอบเบื้องต้น:</b><br>
+          • แอดมิน: <code>admin01</code> | PIN: <code>1234</code><br>
+          • ผู้เช็คชื่อ: <code>checker01</code> | PIN: <code>1234</code>
+        </div>
+        <button type="submit" class="btn-primary" style="width: 100%; justify-content: center;">
+          เข้าสู่ระบบ
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= MODAL: CREATE SESSION ================= -->
+  <div id="new-session-modal" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>สร้างองค์ประชุมใหม่</h3>
+        <button class="btn-close" onclick="App.closeModal('new-session-modal')">&times;</button>
+      </div>
+      <form id="new-session-form">
+        <div class="form-group">
+          <label for="new-session-title">ชื่อหัวข้อ / วาระองค์ประชุม:</label>
+          <input type="text" id="new-session-title" class="form-input" placeholder="เช่น การประชุมสโมสรนักศึกษาครั้งที่ 3" required>
+        </div>
+        <div class="form-group">
+          <label for="new-session-date">วันที่จัดประชุม:</label>
+          <input type="date" id="new-session-date" class="form-input" required>
+        </div>
+        <div class="form-group">
+          <label for="new-session-scope">สาขาวิชาที่ต้องเข้าร่วม:</label>
+          <select id="new-session-scope" class="select-custom form-input">
+            <option value="ALL">ทุกสาขาวิชา (ALL)</option>
+            <option value="RT01">เฉพาะ รังสีเทคนิค (RT01)</option>
+            <option value="PH01">เฉพาะ สาธารณสุขชุมชน (PH01)</option>
+            <option value="DT01">เฉพาะ ทันตสาธารณสุข (DT01)</option>
+          </select>
+        </div>
+        <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; margin-top: 0.5rem;">
+          บันทึกและสร้างองค์ประชุม
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= MODAL: API & SYSTEM SETTINGS ================= -->
+  <div id="settings-modal" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>ตั้งค่าการเชื่อมต่อ Google Sheets</h3>
+        <button class="btn-close" onclick="App.closeModal('settings-modal')">&times;</button>
+      </div>
+      <form id="settings-form">
+        <div class="form-group">
+          <label for="setting-api-url">Google Apps Script Web App URL:</label>
+          <input type="url" id="setting-api-url" class="form-input" placeholder="https://script.google.com/macros/s/.../exec">
+          <div class="text-xs text-muted" style="margin-top: 0.35rem;">
+            URL ที่ได้จากการ Deploy Web App ใน Google Spreadsheet (Execute as: Me, Access: Anyone)
+          </div>
+        </div>
+
+        <div style="margin-bottom: 1rem;">
+          <button type="button" class="btn-outline btn-sm" onclick="App.testApiUrl()">
+            🔌 ทดสอบการเชื่อมต่อ (Ping Test)
+          </button>
+          <span id="test-api-result" class="text-xs" style="margin-left: 0.5rem;"></span>
+        </div>
+
+        <div class="form-group" style="display: flex; align-items: center; gap: 0.6rem;">
+          <input type="checkbox" id="setting-mock-mode" style="width: 18px; height: 18px;">
+          <label for="setting-mock-mode" style="margin-bottom: 0; cursor: pointer; font-size: 0.9rem;">
+            ใช้โหมดข้อมูลจำลองในเครื่อง (Mock Mode / Demo Data)
+          </label>
+        </div>
+
+        <div style="background: #FEF3C7; border: 1px solid #FCD34D; padding: 0.75rem; border-radius: var(--radius-sm); font-size: 0.8rem; color: #92400E; margin-bottom: 1.25rem;">
+          📌 <b>คำแนะนำ:</b> ไฟล์โค้ด Google Apps Script ตัวเต็มอยู่ที่ <code>apps-script/Code.gs</code> สามารถก๊อปปี้ไปวางใน Extensions &gt; Apps Script ใน Google Sheets ได้ทันที
+        </div>
+
+        <button type="submit" class="btn-primary" style="width: 100%; justify-content: center;">
+          บันทึกการตั้งค่า
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= SCRIPTS ================= -->
+  <script src="js/config.js"></script>
+  <script src="js/mock-data.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/attendance.js"></script>
+  <script src="js/dashboard.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
