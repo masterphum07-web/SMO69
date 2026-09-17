@@ -264,6 +264,28 @@ function doGet(e) {
         result = generateSessionReport(e.parameter.sessionId);
         break;
 
+      case 'createSession':
+        result = createSession(e.parameter.title, e.parameter.date, e.parameter.branchScope, e.parameter.adminId);
+        break;
+
+      case 'saveAttendanceDraft':
+        let draftRecords = [];
+        try {
+          draftRecords = typeof e.parameter.records === 'string' ? JSON.parse(e.parameter.records) : (e.parameter.records || []);
+        } catch (jsonErr) {
+          draftRecords = [];
+        }
+        result = saveAttendanceDraft(e.parameter.sessionId, draftRecords, e.parameter.adminId);
+        break;
+
+      case 'submitAttendance':
+        result = submitAttendance(e.parameter.sessionId, e.parameter.adminId);
+        break;
+
+      case 'login':
+        result = loginCheck(e.parameter.adminId, e.parameter.pin);
+        break;
+
       default:
         result = { success: false, error: 'Unknown GET action: ' + action };
     }

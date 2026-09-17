@@ -1,4 +1,4 @@
-﻿/* -------------------------------------------------------------
+/* -------------------------------------------------------------
    ระบบเช็คชื่อสโมสรนักศึกษาปี 69
    วิทยาลัยเทคโนโลยีทางการแพทย์และสาธารณสุข กาญจนาภิเษก (วทก.)
    FORMAL INSTITUTIONAL ACADEMIC THEME
@@ -764,6 +764,33 @@ body {
   border-color: var(--status-absent);
   color: #FFFFFF;
   font-weight: 600;
+}
+
+.btn-status.disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.session-notice-bar {
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.86rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.2s ease;
+}
+
+.session-notice-bar.locked {
+  background-color: #EFF6FF;
+  border: 1px solid #BFDBFE;
+  color: #1E40AF;
+}
+
+.session-notice-bar.active {
+  background-color: #F0FDF4;
+  border: 1px solid #BBF7D0;
+  color: #166534;
 }
 
 /* ---------------- BUTTONS ---------------- */

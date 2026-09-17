@@ -140,19 +140,39 @@ const Api = {
       ...payload
     };
 
+    // 1. ลองยิงด้วย fetch POST ปกติ
     try {
-      // ใช้ text/plain เพื่อป้องกัน CORS preflight OPTIONS request
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
+
       const res = await fetch(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify(bodyData)
+        body: JSON.stringify(bodyData),
+        signal: controller.signal
       });
-      if (!res.ok) throw new Error('HTTP Status ' + res.status);
-      const data = await res.json();
-      this.clearCache(); // ล้างแคชเมื่อมีการบันทึกข้อมูล
-      return data;
+      clearTimeout(timeoutId);
+
+      if (res.ok) {
+        const data = await res.json();
+        this.clearCache();
+        return data;
+      }
     } catch (err) {
-      console.warn(`[Api POST ${action}] ข้อผิดพลาด (${err.message}) บันทึกชั่วคราวใน Local Mock`);
+      console.warn(`[Api POST ${action}] Fetch ขัดข้อง (${err.message}) สลับไปใช้ JSONP GET สำรอง...`);
+    }
+
+    // 2. ใช้ JSONP สำรอง (รับประกัน 100% บายพาส CORS Redirect ของ Google Apps Script)
+    try {
+      const jsonpParams = { ...payload };
+      if (typeof jsonpParams.records === 'object') {
+        jsonpParams.records = JSON.stringify(jsonpParams.records);
+      }
+      const jsonpData = await this.fetchJsonp(apiUrl, action, jsonpParams);
+      this.clearCache();
+      return jsonpData;
+    } catch (jsonpErr) {
+      console.warn(`[Api POST ${action}] JSONP สำรองขัดข้อง (${jsonpErr.message}) สลับไปใช้ Local Mock`);
       return this.mockPost(action, payload);
     }
   },

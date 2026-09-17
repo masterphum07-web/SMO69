@@ -67,14 +67,35 @@ const App = {
     if (newSessionForm) {
       newSessionForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const title = document.getElementById('new-session-title').value;
+        const title = document.getElementById('new-session-title').value.trim();
         const date = document.getElementById('new-session-date').value;
         const scope = document.getElementById('new-session-scope').value;
 
-        const success = await Attendance.createNewSession(title, date, scope);
-        if (success) {
-          this.closeModal('new-session-modal');
-          newSessionForm.reset();
+        if (!title || !date) {
+          alert('กรุณากรอกชื่อหัวข้อและวันที่');
+          return;
+        }
+
+        const submitBtn = newSessionForm.querySelector('button[type="submit"]');
+        const origText = submitBtn ? submitBtn.textContent : '';
+        if (submitBtn) {
+          submitBtn.disabled = true;
+          submitBtn.textContent = '⏳ กำลังบันทึกองค์ประชุม...';
+        }
+
+        try {
+          const success = await Attendance.createNewSession(title, date, scope);
+          if (success) {
+            this.closeModal('new-session-modal');
+            newSessionForm.reset();
+            // นำทางไปยังแท็บเช็คชื่อทันที
+            this.switchTab('attendance');
+          }
+        } finally {
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = origText;
+          }
         }
       });
     }
