@@ -223,9 +223,12 @@
             <span>รวม: <b id="count-total">0</b> คน</span>
           </div>
 
-          <div style="display: flex; gap: 0.5rem;">
-            <button class="btn-outline btn-sm" onclick="Attendance.markAllAs('มา')">
-              ✓ เช็ค "มา" ทุกคนที่แสดง
+          <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <button type="button" class="btn-success btn-sm" onclick="Attendance.markRemainingAs('มา')" title="เช็คเฉพาะคนที่ยังไม่ได้เช็คให้เป็น มา โดยคงคนที่เช็คว่า สาย, ลา, ขาด ไว้เหมือนเดิม">
+              ⚡ เช็คคนที่เหลือเป็น "มา"
+            </button>
+            <button type="button" class="btn-outline btn-sm" onclick="Attendance.markAllAs('มา')" title="ตั้งทุกคนที่แสดงอยู่ให้เป็น มา ทั้งหมด">
+              ✓ เช็คทุกคนว่า "มา"
             </button>
             <button type="button" class="btn-outline btn-sm text-danger" onclick="Attendance.resetAllAttendance()" title="รีเซ็ตสถานะทุกคนขององค์ประชุมนี้กลับเป็น ยังไม่เช็ค">
               🔄 ล้างผลเช็คชื่อ (Reset)

@@ -362,6 +362,45 @@ const Attendance = {
     }
   },
 
+  markRemainingAs(status = 'มา') {
+    if (!this.currentSession) {
+      alert('⚠️ ยังไม่ได้เลือกองค์ประชุม!\n\nกรุณาเลือกองค์ประชุมที่กล่องด้านบน หรือกดปุ่ม "+ สร้างองค์ประชุมใหม่" ก่อนเริ่มเช็คชื่อครับ');
+      return;
+    }
+
+    if (this.currentSession.status === 'submitted') {
+      const confirmEdit = confirm('องค์ประชุมนี้ส่งสรุปผลไปแล้ว ต้องการแก้ไขสถานะเพิ่มเติมใช่หรือไม่?');
+      if (!confirmEdit) return;
+    }
+
+    const filtered = this.getFilteredStudents();
+    // คัดกรองเฉพาะคนที่ยังไม่ได้เช็ค (ยังไม่มีสถานะ หรือสถานะเป็น 'ยังไม่เช็ค')
+    const remaining = filtered.filter(st => {
+      const s = this.records[st.full_name];
+      return !s || s === 'ยังไม่เช็ค';
+    });
+
+    if (remaining.length === 0) {
+      alert('💡 สมาชิกทุกคนที่แสดงอยู่ได้รับการเช็คชื่อครบเรียบร้อยแล้ว ไม่มีคนที่เหลือครับ');
+      return;
+    }
+
+    const countAlready = filtered.length - remaining.length;
+    let detailMsg = `ต้องการตั้งสถานะคนที่ยังไม่ได้เช็ค (${remaining.length} คน) ให้เป็น "${status}" ใช่หรือไม่?`;
+    if (countAlready > 0) {
+      detailMsg += `\n\n(สมาชิกอีก ${countAlready} คนที่เช็คสถานะไว้แล้ว เช่น สาย, ลา, ขาด จะคงเดิม ไม่ถูกเปลี่ยนแปลง)`;
+    }
+
+    if (!confirm(detailMsg)) return;
+
+    remaining.forEach(st => {
+      this.records[st.full_name] = status;
+    });
+
+    this.render();
+    this.triggerAutoSave();
+  },
+
   markAllAs(status) {
     if (!this.currentSession) {
       alert('⚠️ ยังไม่ได้เลือกองค์ประชุม!\n\nกรุณาเลือกองค์ประชุมที่กล่องด้านบน หรือกดปุ่ม "+ สร้างองค์ประชุมใหม่" ก่อนเริ่มเช็คชื่อครับ');
