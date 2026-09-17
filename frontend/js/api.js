@@ -18,14 +18,26 @@ const Api = {
       return { success: true, data: this.cache.initialData };
     }
 
-    const res = await this.requestGet('getInitialData');
-    if (res && res.success && res.data) {
-      this.cache.initialData = res.data;
-      if (res.data.branches) this.cache.branches = res.data.branches;
-      if (res.data.students) this.cache.students = res.data.students;
-      if (res.data.sessions) this.cache.sessions = res.data.sessions;
+    // พยายามโหลดสูงสุด 2 ครั้ง (ป้องกัน cold start ของ Google Apps Script)
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      const res = await this.requestGet('getInitialData');
+      if (res && res.success && res.data) {
+        this.cache.initialData = res.data;
+        if (res.data.branches) this.cache.branches = res.data.branches;
+        if (res.data.students) this.cache.students = res.data.students;
+        if (res.data.sessions) this.cache.sessions = res.data.sessions;
+        return res;
+      }
+      // ลองอีกรอบหลังรอ 1.5 วินาที
+      if (attempt < 2) {
+        console.warn(`[Api getInitialData] ครั้งที่ ${attempt} ไม่สำเร็จ ลองอีกครั้ง...`);
+        await new Promise(r => setTimeout(r, 1500));
+      }
     }
-    return res;
+
+    // ถ้าลองทั้ง 2 ครั้งแล้วไม่สำเร็จ คืน mock data
+    console.warn('[Api getInitialData] ไม่สำเร็จ 2 ครั้ง ใช้ mock data');
+    return this.mockGet('getInitialData', {});
   },
 
   clearCache() {
@@ -54,7 +66,7 @@ const Api = {
       });
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3500);
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
 
       const res = await fetch(url.toString(), {
         method: 'GET',
@@ -118,8 +130,8 @@ const Api = {
 
       timer = setTimeout(() => {
         cleanup();
-        reject(new Error('JSONP request timeout (8s)'));
-      }, 8000);
+        reject(new Error('JSONP request timeout (15s)'));
+      }, 15000);
 
       document.head.appendChild(script);
     });
@@ -143,7 +155,7 @@ const Api = {
     // 1. ลองยิงด้วย fetch POST ปกติ
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 4000);
+      const timeoutId = setTimeout(() => controller.abort(), 12000);
 
       const res = await fetch(apiUrl, {
         method: 'POST',

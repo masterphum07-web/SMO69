@@ -15,6 +15,7 @@ const Dashboard = {
   publicAttendanceMap: {},
   publicBranchFilter: 'ALL',
   publicSearchQuery: '',
+  _loadRetryCount: 0,
 
   async init() {
     await this.loadPublicStats();
@@ -47,8 +48,9 @@ const Dashboard = {
     }
 
     try {
-      // ดึงข้อมูลทั้งหมดผ่าน getInitialData ครั้งเดียวจบ
-      const initRes = await Api.getInitialData(isBackground);
+      // ดึงข้อมูลทั้งหมดผ่าน getInitialData — ครั้งแรกบังคับ fresh, background ใช้ cache ได้
+      const forceRefresh = !isBackground || !Api.cache.initialData;
+      const initRes = await Api.getInitialData(forceRefresh);
       if (initRes && initRes.success && initRes.data) {
         const d = initRes.data;
         this.branches = d.branches || [];
@@ -80,11 +82,21 @@ const Dashboard = {
           const now = new Date().toLocaleTimeString('th-TH');
           pollIndicator.innerHTML = `<span class="pulse-dot active"></span> อัปเดตเรียลไทม์ล่าสุดเมื่อ ${now}`;
         }
+      } else if (!isBackground && this._loadRetryCount < 1) {
+        // Initial load ล้มเหลว → รอ 2 วิ แล้วลองอีกครั้ง (สูงสุด 1 ครั้ง)
+        this._loadRetryCount++;
+        console.warn('โหลด Public Stats ไม่สำเร็จ ลองอีกครั้ง...');
+        if (pollIndicator) {
+          pollIndicator.innerHTML = '<span class="pulse-dot"></span> กำลังลองเชื่อมต่ออีกครั้ง...';
+        }
+        await new Promise(r => setTimeout(r, 2000));
+        Api.clearCache();
+        return this.loadPublicStats(false);
       }
     } catch (err) {
       console.warn('โหลด Public Stats ไม่สำเร็จ:', err);
       if (pollIndicator) {
-        pollIndicator.innerHTML = '<span class="pulse-dot error"></span> การเชื่อมต่อขัดข้อง ชั่วคราว';
+        pollIndicator.innerHTML = '<span class="pulse-dot error"></span> การเชื่อมต่อขัดข้อง — ลองรีเฟรชหน้าเว็บอีกครั้ง';
       }
     }
   },

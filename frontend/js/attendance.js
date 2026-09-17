@@ -374,12 +374,12 @@ const Attendance = {
     }
 
     const title = this.currentSession.session_title;
+    const deletedId = this.currentSessionId;
     const confirmMsg = `⚠️ คำเตือน: คุณต้องการลบวาระองค์ประชุมนี้ใช่หรือไม่?\n\n` +
       `📌 หัวข้อ: "${title}" (${this.currentSession.session_date})\n\n` +
       `เมื่อลบแล้ว:\n` +
       `• รายการองค์ประชุมนี้จะถูกลบออกจากระบบ\n` +
-      `• ข้อมูลการเช็คชื่อทั้งหมดของวาระนี้จะถูกลบ\n` +
-      `• แท็บ "วาระ_${title.substring(0, 20)}" ใน Google Sheets จะถูกลบออกอัตโนมัติ\n\n` +
+      `• ข้อมูลการเช็คชื่อทั้งหมดของวาระนี้จะถูกลบ\n\n` +
       `ยืนยันการลบหรือไม่? (การกระทำนี้ไม่สามารถย้อนกลับได้)`;
 
     if (!confirm(confirmMsg)) return;
@@ -393,54 +393,62 @@ const Attendance = {
       btn.textContent = '⏳ กำลังลบ...';
     }
 
+    let apiOk = false;
+    let apiError = '';
+
+    // พยายามลบผ่าน API
     try {
       const res = await Api.requestPost('deleteSession', {
-        sessionId: this.currentSessionId,
+        sessionId: deletedId,
         adminId: adminId
       });
-
-      // ไม่ว่า API จะ success หรือ error (เช่น ลบในชีตไปแล้ว) ให้ลบออกจาก UI เสมอ
-      const isApiSuccess = (res && res.success);
-      const isOrphanedSession = (!isApiSuccess && res && res.error && res.error.includes('ไม่พบ'));
-
-      if (isApiSuccess || isOrphanedSession) {
-        if (isApiSuccess) {
-          alert(`✅ ลบวาระองค์ประชุม "${title}" และลบแท็บใน Google Sheets สำเร็จเรียบร้อยแล้ว!`);
-        } else {
-          alert(`✅ วาระ "${title}" ถูกลบออกจากชีตไปแล้ว ระบบได้นำออกจากหน้าเว็บให้เรียบร้อยแล้วครับ`);
-        }
-        
-        // ล้าง session ปัจจุบัน
-        const deletedId = this.currentSessionId;
-        this.currentSessionId = null;
-        this.currentSession = null;
-        this.records = {};
-
-        // นำออกจาก array sessions ทันที
-        if (Array.isArray(this.sessions)) {
-          this.sessions = this.sessions.filter(s => s.session_id !== deletedId);
-        }
-
-        // ล้าง cache เพื่อดึงข้อมูลจริงจากชีตใหม่ในรอบถัดไป
-        Api.clearCache();
-
-        // โหลดรายการและเรนเดอร์ใหม่
-        this.populateSessions(this.sessions);
-
-        // รีเฟรชสถิติ Dashboard
-        if (window.Dashboard) {
-          window.Dashboard.load();
-        }
-      } else {
-        alert('⚠️ ไม่สามารถลบวาระได้: ' + (res ? res.error : 'โปรดตรวจสอบการเชื่อมต่อ'));
+      apiOk = (res && res.success);
+      if (!apiOk) {
+        apiError = (res && res.error) ? res.error : 'ไม่ทราบสาเหตุ';
       }
     } catch (err) {
-      alert('⚠️ เกิดข้อผิดพลาดในการลบ: ' + err.message);
-    } finally {
-      if (btn) {
-        btn.disabled = false;
-        btn.textContent = '🗑️ ลบวาระนี้';
+      apiError = err.message || 'การเชื่อมต่อขัดข้อง';
+    }
+
+    // ✅ ลบสำเร็จจาก API → ลบออกจาก UI ทันที
+    if (apiOk) {
+      alert(`✅ ลบวาระ "${title}" สำเร็จเรียบร้อยแล้ว!`);
+      this._removeSessionFromUI(deletedId);
+    } else {
+      // ❌ API ล้มเหลว → ถามว่าจะลบออกจากหน้าเว็บอย่างเดียวไหม
+      const forceRemove = confirm(
+        `⚠️ ลบจาก Google Sheet ไม่สำเร็จ:\n${apiError}\n\n` +
+        `(อาจเป็นเพราะวาระนี้ถูกลบจากชีตไปแล้ว หรือเครือข่ายขัดข้อง)\n\n` +
+        `🔹 ต้องการลบวาระ "${title}" ออกจากหน้าเว็บอย่างเดียวหรือไม่?\n` +
+        `(กด "ตกลง" เพื่อลบออกจากหน้าเว็บ)`
+      );
+      if (forceRemove) {
+        this._removeSessionFromUI(deletedId);
+        alert(`✅ ลบวาระ "${title}" ออกจากหน้าเว็บเรียบร้อยแล้ว`);
       }
+    }
+
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = '🗑️ ลบวาระนี้';
+    }
+  },
+
+  /** ฟังก์ชันภายใน: ลบ session ออกจาก UI/state ทันที */
+  _removeSessionFromUI(sessionId) {
+    this.currentSessionId = null;
+    this.currentSession = null;
+    this.records = {};
+
+    if (Array.isArray(this.sessions)) {
+      this.sessions = this.sessions.filter(s => s.session_id !== sessionId);
+    }
+
+    Api.clearCache();
+    this.populateSessions(this.sessions);
+
+    if (window.Dashboard) {
+      try { Dashboard.loadPublicStats(true); } catch (e) {}
     }
   },
 
