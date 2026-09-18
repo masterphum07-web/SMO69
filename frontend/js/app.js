@@ -10,20 +10,26 @@ const App = {
     this.updateAuthUI();
     this.updateConnectionStatusBadge();
 
-    // 1. ดึงข้อมูลภาพรวมระบบ (จะดึงจาก localStorage ทันทีถ้ามีแคช ทำให้เปิดหน้าเว็บได้ใน 0 วิ ไม่ติดจอขาว)
-    await Api.getInitialData(false);
+    // 1. นำข้อมูลจากแคชในเครื่องมาแสดงผลทันที (0ms) ป้องกันหน้าค้างหรือจอขาว
+    const cached = Api.getCachedInitialData();
+    if (cached) {
+      Api.cache.initialData = cached;
+      if (cached.branches) Api.cache.branches = cached.branches;
+      if (cached.students) Api.cache.students = cached.students;
+      if (cached.sessions) Api.cache.sessions = cached.sessions;
+    }
 
-    // 2. เริ่มต้นโมดูลต่าง ๆ ด้วยข้อมูลแคช/เริ่มต้นทันที
-    await Dashboard.init(true);
+    // 2. เริ่มต้นโมดูลต่าง ๆ ทันที
+    await Dashboard.init();
     await Attendance.init();
 
     // 3. แสดงแท็บแรก
     this.switchTab('public');
 
-    // 4. สั่งรีเฟรชข้อมูลเบื้องหลังเพื่อให้ได้สถานะเรียลไทม์สดใหม่จาก Google Sheets
+    // 4. สั่งซิงค์ข้อมูลล่าสุดจาก Google Sheets ในเบื้องหลังทันที (พร้อมอัปเดต UI และลบวาระที่หายไป)
     setTimeout(() => {
-      Dashboard.loadPublicStats(true);
-    }, 200);
+      Dashboard.loadPublicStats(false, true);
+    }, 100);
   },
 
   bindEvents() {

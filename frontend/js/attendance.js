@@ -16,7 +16,35 @@ const Attendance = {
   isSaving: false,
 
   async init() {
+    // 1. ลงทะเบียนรับข้อมูลสดใหม่จาก Server เสมอ
+    if (window.Api && typeof Api.onDataSync === 'function') {
+      Api.onDataSync((data) => {
+        this.syncSessionsFromServer(data.sessions, data.students, data.branches);
+      });
+    }
     await this.loadInitialData();
+  },
+
+  syncSessionsFromServer(sessions, students, branches) {
+    if (Array.isArray(branches) && branches.length > 0) {
+      this.branches = branches;
+    }
+    if (Array.isArray(students) && students.length > 0) {
+      this.students = students;
+    }
+    if (Array.isArray(sessions)) {
+      this.sessions = sessions;
+      // ตรวจสอบว่าวาระปัจจุบันที่เลือกไว้ ยังมีอยู่ใน sessions ใหม่หรือไม่ (ถ้าถูกลบในชีต ให้สลับไปวาระแรก)
+      const stillValid = this.currentSessionId && this.sessions.some(s => s.session_id === this.currentSessionId);
+      if (!stillValid) {
+        this.currentSessionId = this.sessions.length > 0 ? this.sessions[0].session_id : null;
+        this.currentSession = this.sessions.length > 0 ? this.sessions[0] : null;
+        this.records = {};
+      } else {
+        this.currentSession = this.sessions.find(s => s.session_id === this.currentSessionId) || null;
+      }
+      this.populateSessions(this.sessions);
+    }
   },
 
   async loadInitialData(force = false) {
@@ -391,11 +419,12 @@ const Attendance = {
     let apiOk = false;
     let apiError = '';
 
-    // พยายามลบผ่าน API
+    // พยายามลบผ่าน API โดยส่งทั้ง sessionId และ title
     try {
       const res = await Api.requestPost('deleteSession', {
         sessionId: deletedId,
-        adminId: adminId
+        adminId: adminId,
+        title: title
       });
       apiOk = (res && res.success);
       if (!apiOk) {
@@ -773,3 +802,5 @@ const Attendance = {
     }
   }
 };
+
+window.Attendance = Attendance;

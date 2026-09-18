@@ -164,7 +164,7 @@
             <select id="public-session-select" class="select-custom" style="font-size: 0.82rem; padding: 0.4rem 0.75rem; min-width: 220px;" onchange="Dashboard.onPublicSessionChange(this.value)">
               <option value="">กำลังโหลดรายการวาระ...</option>
             </select>
-            <button class="btn-outline btn-sm" onclick="Dashboard.loadPublicStats()">
+            <button class="btn-outline btn-sm" onclick="Dashboard.loadPublicStats(false, true)" title="ดึงข้อมูลล่าสุดจาก Google Sheets ทันที">
               🔄 รีเฟรช
             </button>
           </div>
@@ -202,12 +202,15 @@
         <div class="card-header-flex">
           <div style="flex: 1; min-width: 260px;">
             <label class="text-xs font-semibold text-muted" for="session-select">เลือกองค์ประชุม / วาระการเช็คชื่อ:</label>
-            <div style="display: flex; gap: 0.5rem; margin-top: 0.25rem;">
-              <select id="session-select" class="select-custom" style="flex: 1;">
+            <div style="display: flex; gap: 0.5rem; margin-top: 0.25rem; flex-wrap: wrap;">
+              <select id="session-select" class="select-custom" style="flex: 1; min-width: 200px;">
                 <option>กำลังโหลดรายการ...</option>
               </select>
               <button class="btn-primary" onclick="App.openNewSessionModal()">
                 + สร้างองค์ประชุมใหม่
+              </button>
+              <button type="button" class="btn-outline btn-sm" onclick="Attendance.loadInitialData(true)" title="ซิงค์รายชื่อวาระจาก Google Sheets ล่าสุด">
+                🔄 ซิงค์
               </button>
               <button id="btn-delete-session" type="button" class="btn-outline text-danger" style="display: none;" onclick="Attendance.deleteCurrentSession()" title="ลบวาระองค์ประชุมนี้ออกจากระบบและ Google Sheets">
                 🗑️ ลบวาระนี้

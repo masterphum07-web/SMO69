@@ -14,6 +14,21 @@ const Api = {
     students: null,
     sessions: null
   },
+  _inFlightInitialDataPromise: null,
+  _syncListeners: [],
+
+  onDataSync(fn) {
+    if (typeof fn === 'function') {
+      this._syncListeners.push(fn);
+    }
+  },
+
+  notifyDataSync(data) {
+    if (!data) return;
+    this._syncListeners.forEach(fn => {
+      try { fn(data); } catch (e) { console.error('DataSync listener error:', e); }
+    });
+  },
 
   getCachedInitialData() {
     try {
@@ -36,6 +51,28 @@ const Api = {
     } catch (e) {}
   },
 
+  addSessionToCache(session) {
+    if (!session || !session.session_id) return;
+    const cached = this.getCachedInitialData() || {};
+    if (!Array.isArray(cached.sessions)) cached.sessions = [];
+    if (!cached.sessions.some(s => s.session_id === session.session_id)) {
+      cached.sessions.unshift(session);
+    }
+    this.setCachedInitialData(cached);
+  },
+
+  updateSessionStatusInCache(sessionId, status) {
+    if (!sessionId) return;
+    const cached = this.getCachedInitialData();
+    if (cached && Array.isArray(cached.sessions)) {
+      const sess = cached.sessions.find(s => s.session_id === sessionId);
+      if (sess) {
+        sess.status = status;
+        this.setCachedInitialData(cached);
+      }
+    }
+  },
+
   purgeSessionFromCache(sessionId) {
     if (!sessionId) return;
     if (this.cache.initialData && Array.isArray(this.cache.initialData.sessions)) {
@@ -56,39 +93,80 @@ const Api = {
     } catch (e) {}
   },
 
-  async getInitialData(forceRefresh = false) {
+  syncInitialDataInBackground() {
+    if (this._inFlightInitialDataPromise) return;
+    this.getInitialData(true).catch(err => {
+      console.warn('[Api Background Sync Notice]', err);
+    });
+  },
+
+  getInitialData(forceRefresh = false) {
     const cached = this.getCachedInitialData();
+
+    // 1. Stale-While-Revalidate: คืนแคชทันที (0ms) เพื่อไม่ให้จอค้างหรือหมุนนาน
+    // และเริ่ม sync ในเบื้องหลังทันที
     if (!forceRefresh && cached) {
       this.cache.initialData = cached;
       if (cached.branches) this.cache.branches = cached.branches;
       if (cached.students) this.cache.students = cached.students;
       if (cached.sessions) this.cache.sessions = cached.sessions;
-      return { success: true, data: cached };
+
+      // กระตุ้นการซิงค์ข้อมูลสดใหม่ในเบื้องหลัง
+      setTimeout(() => {
+        this.syncInitialDataInBackground();
+      }, 50);
+
+      return Promise.resolve({ success: true, data: cached, fromCache: true });
     }
 
-    // พยายามโหลดจาก network (สูงสุด 2 ครั้งเพื่อรับมือ Apps Script cold start)
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      const res = await this.requestGet('getInitialData');
-      if (res && res.success && res.data) {
-        this.setCachedInitialData(res.data);
-        return res;
+    // 2. Request Deduplication: หากมีคำขอ getInitialData ยิงค้างอยู่แล้ว ให้แชร์ผลลัพธ์ร่วมกัน
+    if (this._inFlightInitialDataPromise) {
+      return this._inFlightInitialDataPromise;
+    }
+
+    // 3. ยิงคำขอเครือข่าย
+    this._inFlightInitialDataPromise = (async () => {
+      try {
+        // พยายามโหลดจาก network (สูงสุด 2 ครั้ง)
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          const res = await this.requestGet('getInitialData');
+          if (res && res.success && res.data) {
+            this.setCachedInitialData(res.data);
+            this.notifyDataSync(res.data);
+            return res;
+          }
+          if (attempt < 2) {
+            console.warn(`[Api getInitialData] ครั้งที่ ${attempt} ไม่สำเร็จ รอ 1 วินาทีแล้วลองใหม่...`);
+            await new Promise(r => setTimeout(r, 1000));
+          }
+        }
+
+        // หากโหลดจากเน็ตไม่สำเร็จ แต่มีข้อมูลแคชในเครื่อง ให้ใช้แคชล่าสุด (ห้ามลบ/ห้ามแทนที่ด้วย mock ว่างเปล่า)
+        if (cached) {
+          console.warn('[Api getInitialData] เชื่อมต่อเน็ตไม่สำเร็จ ใช้ข้อมูลแคชล่าสุดในเครื่อง');
+          this.cache.initialData = cached;
+          return { success: true, data: cached, isStale: true };
+        }
+
+        // หากไม่มีแคชเลย และเปิดโหมด mock
+        if (Config.isMockMode()) {
+          return this.mockGet('getInitialData', {});
+        }
+
+        // ฉุกเฉิน: ใช้ mock data เพื่อให้ได้รายชื่อนักศึกษา 53 คนขึ้นมา ป้องกันหน้าว่างเปล่า
+        console.warn('[Api getInitialData] ไม่พบแคชในเครื่องและเชื่อมต่อเน็ตไม่ได้ ใช้ข้อมูลรายชื่อเริ่มต้นสำรอง');
+        const mockRes = await this.mockGet('getInitialData', {});
+        return {
+          success: true,
+          data: mockRes.data,
+          isOfflineFallback: true
+        };
+      } finally {
+        this._inFlightInitialDataPromise = null;
       }
-      if (attempt < 2) {
-        console.warn(`[Api getInitialData] ครั้งที่ ${attempt} ไม่สำเร็จ รอ 1.2 วินาทีแล้วลองใหม่...`);
-        await new Promise(r => setTimeout(r, 1200));
-      }
-    }
+    })();
 
-    // หากโหลดจากเน็ตไม่สำเร็จ แต่มีข้อมูลแคชในเครื่อง ให้คืนแคชแทน mock ป้องกันหน้าขาว
-    if (cached) {
-      console.warn('[Api getInitialData] ใช้ข้อมูลแคชล่าสุดในเครื่องสำรอง');
-      this.cache.initialData = cached;
-      return { success: true, data: cached, isStale: true };
-    }
-
-    // หากไม่มีแคชเลย คืน mock data
-    console.warn('[Api getInitialData] ไม่พบแคชในเครื่อง ใช้ mock data');
-    return this.mockGet('getInitialData', {});
+    return this._inFlightInitialDataPromise;
   },
 
   clearCache() {
@@ -109,7 +187,7 @@ const Api = {
       return this.mockGet(action, params);
     }
 
-    // 1. ลองดึงข้อมูลด้วย fetch ปกติก่อน (ใช้ timeout สั้น 2.5 วินาที เพื่อไม่ให้ผู้ใช้รอนานหากติด CORS)
+    // 1. ลองดึงข้อมูลด้วย fetch ปกติ (timeout 12 วินาที พอเพียงสำหรับ Google Apps Script)
     try {
       const url = new URL(apiUrl);
       url.searchParams.set('action', action);
@@ -120,7 +198,7 @@ const Api = {
       });
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2500);
+      const timeoutId = setTimeout(() => controller.abort(), 12000);
 
       const res = await fetch(url.toString(), {
         method: 'GET',
@@ -134,7 +212,7 @@ const Api = {
         return data;
       }
     } catch (fetchErr) {
-      // หากเกิด CORS หรือ timeout (2.5 วิ) ให้สลับไปใช้ JSONP อัตโนมัติทันที
+      // หากเกิด CORS หรือ timeout ให้สลับไปใช้ JSONP สำรอง
     }
 
     // 2. ใช้ JSONP ซึ่งรับประกันการเชื่อมต่อกับ Apps Script 100% โดยไม่มีข้อจำกัด CORS
@@ -193,7 +271,7 @@ const Api = {
         reject(new Error('JSONP script load error'));
       };
 
-      // ให้เวลา Apps Script Cold Start สูงสุด 25 วินาที ป้องกัน timeout หลอก
+      // ให้เวลา Apps Script สูงสุด 25 วินาที
       timer = setTimeout(() => {
         cleanup();
         reject(new Error('JSONP request timeout (25s)'));
@@ -218,10 +296,12 @@ const Api = {
       ...payload
     };
 
-    // 1. ลองยิงด้วย fetch POST ปกติ (timeout 3.5 วินาที)
+    let postRes = null;
+
+    // 1. ลองยิงด้วย fetch POST (timeout 12 วินาที)
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3500);
+      const timeoutId = setTimeout(() => controller.abort(), 12000);
 
       const res = await fetch(apiUrl, {
         method: 'POST',
@@ -232,39 +312,48 @@ const Api = {
       clearTimeout(timeoutId);
 
       if (res.ok) {
-        const data = await res.json();
-        this.clearCache();
-        return data;
+        postRes = await res.json();
       }
     } catch (err) {
       // Fetch ขัดข้อง สลับไปใช้ JSONP สำรอง
     }
 
     // 2. ใช้ JSONP สำรอง (รับประกัน 100% บายพาส CORS Redirect ของ Google Apps Script)
-    try {
-      const jsonpParams = { ...payload };
-      if (typeof jsonpParams.records === 'object') {
-        jsonpParams.records = JSON.stringify(jsonpParams.records);
-      }
-      const jsonpData = await this.fetchJsonp(apiUrl, action, jsonpParams);
-      this.clearCache();
-      return jsonpData;
-    } catch (jsonpErr) {
-      console.warn(`[Api POST ${action}] JSONP สำรองครั้งที่ 1 ขัดข้อง (${jsonpErr.message}) ลองอีกครั้ง...`);
+    if (!postRes) {
       try {
-        await new Promise(r => setTimeout(r, 1200));
         const jsonpParams = { ...payload };
         if (typeof jsonpParams.records === 'object') {
           jsonpParams.records = JSON.stringify(jsonpParams.records);
         }
-        const retryData = await this.fetchJsonp(apiUrl, action, jsonpParams);
-        this.clearCache();
-        return retryData;
-      } catch (retryErr) {
-        console.warn(`[Api POST ${action}] JSONP ล้มเหลว (${retryErr.message}) สลับไปใช้ Local Mock`);
-        return this.mockPost(action, payload);
+        postRes = await this.fetchJsonp(apiUrl, action, jsonpParams);
+      } catch (jsonpErr) {
+        console.warn(`[Api POST ${action}] JSONP สำรองครั้งที่ 1 ขัดข้อง (${jsonpErr.message}) ลองอีกครั้ง...`);
+        try {
+          await new Promise(r => setTimeout(r, 1200));
+          const jsonpParams = { ...payload };
+          if (typeof jsonpParams.records === 'object') {
+            jsonpParams.records = JSON.stringify(jsonpParams.records);
+          }
+          postRes = await this.fetchJsonp(apiUrl, action, jsonpParams);
+        } catch (retryErr) {
+          console.warn(`[Api POST ${action}] ล้มเหลว (${retryErr.message}) สลับไปใช้ Local Mock`);
+          return this.mockPost(action, payload);
+        }
       }
     }
+
+    // อัปเดตแคชอย่างชาญฉลาดโดยไม่ทำลายข้อมูลเดิม (ห้าม clearCache() เด็ดขาด เพื่อป้องกันหน้าว่าง)
+    if (postRes && postRes.success) {
+      if (action === 'deleteSession' && payload.sessionId) {
+        this.purgeSessionFromCache(payload.sessionId);
+      } else if (action === 'createSession' && postRes.session) {
+        this.addSessionToCache(postRes.session);
+      } else if (action === 'submitAttendance' && payload.sessionId) {
+        this.updateSessionStatusInCache(payload.sessionId, 'submitted');
+      }
+    }
+
+    return postRes;
   },
 
   mockGet(action, params) {
@@ -355,3 +444,5 @@ const Api = {
     }
   }
 };
+
+window.Api = Api;

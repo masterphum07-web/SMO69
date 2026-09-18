@@ -52,3 +52,5 @@ const Config = {
     localStorage.setItem(CONFIG_KEYS.POLL_INTERVAL, ms);
   }
 };
+
+window.Config = Config;

@@ -496,3 +496,5 @@ const MockDB = {
     };
   }
 };
+
+window.MockDB = MockDB;

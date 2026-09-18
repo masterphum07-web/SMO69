@@ -42,3 +42,5 @@ const Auth = {
     window.location.reload();
   }
 };
+
+window.Auth = Auth;

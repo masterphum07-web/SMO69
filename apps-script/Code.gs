@@ -382,7 +382,7 @@ function doGet(e) {
         break;
 
       case 'deleteSession':
-        result = deleteSession(e.parameter.sessionId, e.parameter.adminId);
+        result = deleteSession(e.parameter.sessionId, e.parameter.adminId, e.parameter.title);
         break;
 
       case 'login':
@@ -438,7 +438,7 @@ function doPost(e) {
         break;
 
       case 'deleteSession':
-        result = deleteSession(payload.sessionId, payload.adminId);
+        result = deleteSession(payload.sessionId, payload.adminId, payload.title);
         break;
 
       default:
@@ -750,7 +750,7 @@ function submitAttendance(sessionId, adminId) {
  * 4. คำนวณ Dashboard Summary ใหม่
  * 5. อัปเดตแท็บสรุปล่าสุด
  */
-function deleteSession(sessionId, adminId) {
+function deleteSession(sessionId, adminId, clientTitle) {
   if (!sessionId) {
     return { success: false, error: 'ไม่พบ Session ID' };
   }
@@ -768,7 +768,7 @@ function deleteSession(sessionId, adminId) {
     // 1. หาข้อมูล Session และลบแถวในชีต Sessions แบบ in-memory (เร็วและเสถียร ไม่ติด timeout)
     const sessSheet = setSheet(SHEETS.SESSIONS);
     const sessData = sessSheet.getDataRange().getValues();
-    let sessionTitle = '';
+    let sessionTitle = clientTitle ? String(clientTitle).trim() : '';
     const newSessRows = [];
 
     if (sessData.length > 0) {
@@ -776,7 +776,7 @@ function deleteSession(sessionId, adminId) {
       for (let i = 1; i < sessData.length; i++) {
         const row = sessData[i];
         if (String(row[0]).trim() === String(sessionId).trim()) {
-          sessionTitle = String(row[1] || '').trim();
+          sessionTitle = String(row[1] || '').trim() || sessionTitle;
         } else if (row[0] && String(row[0]).trim() !== '') {
           newSessRows.push(row);
         }

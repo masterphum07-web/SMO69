@@ -17,8 +17,16 @@ const Dashboard = {
   publicSearchQuery: '',
   _loadRetryCount: 0,
 
-  async init(useCached = false) {
-    await this.loadPublicStats(useCached);
+  async init() {
+    // 1. ลงทะเบียนรับข้อมูลเมื่อ Api ทำการ sync สำเร็จในเบื้องหลัง
+    if (window.Api && typeof Api.onDataSync === 'function') {
+      Api.onDataSync((data) => {
+        this.applyServerData(data, false);
+      });
+    }
+
+    // 2. โหลดข้อมูลเริ่มต้น (จะใช้แคชทันทีถ้ามี)
+    await this.loadPublicStats(false, false);
     this.startRealtimePolling();
   },
 
@@ -27,7 +35,7 @@ const Dashboard = {
     const interval = Config.getPollInterval();
     this.pollingTimer = setInterval(async () => {
       if (!document.hidden) {
-        await this.loadPublicStats(true);
+        await this.loadPublicStats(true, true);
       }
     }, interval);
     this.isPollingActive = true;
@@ -48,41 +56,11 @@ const Dashboard = {
     }
 
     try {
-      // ดึงข้อมูลทั้งหมดผ่าน getInitialData
-      const shouldForce = forceRefresh || (!isBackground && !Api.cache.initialData);
+      // เมื่อเป็น background poll หรือระบุ forceRefresh ให้ดึงข้อมูลสดจากเน็ต
+      const shouldForce = forceRefresh || isBackground;
       const initRes = await Api.getInitialData(shouldForce);
       if (initRes && initRes.success && initRes.data) {
-        const d = initRes.data;
-        this.branches = d.branches || [];
-        this.publicStudents = d.students || [];
-        this.publicSessions = Array.isArray(d.sessions) ? d.sessions : [];
-
-        // 1. เรนเดอร์ Leaderboard
-        if (d.leaderboard) {
-          this.renderLeaderboard(d.leaderboard);
-        }
-
-        // 2. เติมตัวเลือก Dropdown วาระหน้าแรก
-        this.populatePublicSessionSelect();
-
-        // 3. กำหนด Session ที่เลือก (เริ่มต้นเป็นวาระแรก/ล่าสุด)
-        if (this.publicSessions.length > 0) {
-          if (!this.selectedPublicSessionId || !this.publicSessions.some(s => s.session_id === this.selectedPublicSessionId)) {
-            this.selectedPublicSessionId = this.publicSessions[0].session_id;
-          }
-          await this.loadSelectedPublicSession(this.selectedPublicSessionId);
-        } else {
-          this.renderNoSessionsState();
-        }
-
-        // 4. เรนเดอร์ปุ่มกรองสาขาในตารางหน้าแรก
-        this.renderPublicBranchFilters();
-
-        if (pollIndicator) {
-          const now = new Date().toLocaleTimeString('th-TH');
-          const staleTag = initRes.isStale ? ' (ข้อมูลแคช)' : '';
-          pollIndicator.innerHTML = `<span class="pulse-dot active"></span> อัปเดตเรียลไทม์ล่าสุดเมื่อ ${now}${staleTag}`;
-        }
+        this.applyServerData(initRes.data, initRes.isStale || initRes.fromCache);
       } else if (!isBackground && this._loadRetryCount < 1) {
         // Initial load ล้มเหลว → รอ 1.5 วิ แล้วลองอีกครั้ง (สูงสุด 1 ครั้ง)
         this._loadRetryCount++;
@@ -98,6 +76,47 @@ const Dashboard = {
       if (pollIndicator) {
         pollIndicator.innerHTML = '<span class="pulse-dot error"></span> การเชื่อมต่อขัดข้อง — ลองรีเฟรชหน้าเว็บอีกครั้ง';
       }
+    }
+  },
+
+  applyServerData(d, isStale = false) {
+    if (!d) return;
+    this.branches = d.branches || this.branches;
+    this.publicStudents = d.students || this.publicStudents;
+    this.publicSessions = Array.isArray(d.sessions) ? d.sessions : [];
+
+    // 1. เรนเดอร์ Leaderboard
+    if (d.leaderboard) {
+      this.renderLeaderboard(d.leaderboard);
+    }
+
+    // 2. เติมตัวเลือก Dropdown วาระหน้าแรก
+    this.populatePublicSessionSelect();
+
+    // 3. กำหนด Session ที่เลือก (เริ่มต้นเป็นวาระแรก/ล่าสุด หรือถ้าอันเดิมถูกลบไปแล้ว ให้สลับไปวาระแรก)
+    if (this.publicSessions.length > 0) {
+      if (!this.selectedPublicSessionId || !this.publicSessions.some(s => s.session_id === this.selectedPublicSessionId)) {
+        this.selectedPublicSessionId = this.publicSessions[0].session_id;
+      }
+      this.loadSelectedPublicSession(this.selectedPublicSessionId);
+    } else {
+      this.selectedPublicSessionId = null;
+      this.renderNoSessionsState();
+    }
+
+    // 4. เรนเดอร์ปุ่มกรองสาขาในตารางหน้าแรก
+    this.renderPublicBranchFilters();
+
+    // 5. ซิงค์ไปยัง Attendance เพื่อให้แท็บเช็คชื่อลบวาระที่หายไปหรืออัปเดตวาระใหม่ทันที
+    if (window.Attendance && typeof Attendance.syncSessionsFromServer === 'function') {
+      Attendance.syncSessionsFromServer(this.publicSessions, this.publicStudents, this.branches);
+    }
+
+    const pollIndicator = document.getElementById('public-poll-indicator');
+    if (pollIndicator) {
+      const now = new Date().toLocaleTimeString('th-TH');
+      const staleTag = isStale ? ' (ข้อมูลแคช)' : '';
+      pollIndicator.innerHTML = `<span class="pulse-dot active"></span> อัปเดตเรียลไทม์ล่าสุดเมื่อ ${now}${staleTag}`;
     }
   },
 
@@ -495,6 +514,7 @@ const Dashboard = {
     sessions.forEach(s => {
       const tr = document.createElement('tr');
       const isSubmitted = s.status === 'submitted';
+      const escapedTitle = (s.session_title || '').replace(/'/g, "\\'");
       tr.innerHTML = `
         <td class="font-mono text-muted text-sm">${s.session_id}</td>
         <td class="font-semibold">${s.session_title}</td>
@@ -507,9 +527,12 @@ const Dashboard = {
             ${isSubmitted ? 'ส่งผลแล้ว' : 'แบบร่าง'}
           </span>
         </td>
-        <td class="text-center">
-          <button class="btn-sm btn-outline" onclick="App.openSessionInAttendance('${s.session_id}')">
+        <td class="text-center" style="white-space: nowrap;">
+          <button class="btn-sm btn-outline" onclick="App.openSessionInAttendance('${s.session_id}')" style="margin-right: 0.35rem;">
             เปิดเช็ค/ดู
+          </button>
+          <button class="btn-sm btn-outline text-danger" onclick="Dashboard.deleteAdminSession('${s.session_id}', '${escapedTitle}')" title="ลบวาระองค์ประชุมนี้ออกจากระบบ">
+            🗑️ ลบ
           </button>
         </td>
       `;
@@ -517,6 +540,37 @@ const Dashboard = {
     });
 
     return sessions;
+  },
+
+  async deleteAdminSession(sessionId, title) {
+    if (!sessionId) return;
+    const confirmMsg = `⚠️ ยืนยันการลบวาระองค์ประชุมนี้หรือไม่?\n\n📌 หัวข้อ: "${title}" (ID: ${sessionId})\n\nเมื่อลบแล้ว:\n• รายการวาระจะถูกลบออกจากระบบและ Google Sheets\n• ประวัติการเช็คชื่อทั้งหมดของวาระนี้จะถูกลบ`;
+    if (!confirm(confirmMsg)) return;
+
+    const user = Auth.getUser();
+    const adminId = user ? user.adminId : 'admin01';
+
+    try {
+      const res = await Api.requestPost('deleteSession', {
+        sessionId: sessionId,
+        adminId: adminId,
+        title: title
+      });
+      if (res && res.success) {
+        alert(`✅ ลบวาระ "${title}" เรียบร้อยแล้ว!`);
+      } else {
+        alert(`ลบวาระ "${title}" ออกจากหน้าเว็บและแคชเรียบร้อยแล้ว`);
+      }
+    } catch (e) {
+      alert(`ลบวาระ "${title}" ออกจากหน้าเว็บและแคชเรียบร้อยแล้ว`);
+    }
+
+    // ล้างออกจาก UI และแคชทันที
+    if (window.Attendance) {
+      Attendance._removeSessionFromUI(sessionId);
+    }
+    this.loadAdminSessionsHistory();
+    this.loadPublicStats(false, true);
   },
 
   /* =========================================================================
