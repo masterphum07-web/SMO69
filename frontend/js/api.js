@@ -127,18 +127,22 @@ const Api = {
     // 3. ยิงคำขอเครือข่าย
     this._inFlightInitialDataPromise = (async () => {
       try {
-        // พยายามโหลดจาก network (สูงสุด 2 ครั้ง)
-        for (let attempt = 1; attempt <= 2; attempt++) {
-          const res = await this.requestGet('getInitialData');
-          if (res && res.success && res.data) {
-            this.setCachedInitialData(res.data);
-            this.notifyDataSync(res.data);
-            return res;
-          }
-          if (attempt < 2) {
-            console.warn(`[Api getInitialData] ครั้งที่ ${attempt} ไม่สำเร็จ รอ 1 วินาทีแล้วลองใหม่...`);
-            await new Promise(r => setTimeout(r, 1000));
-          }
+        // ดึงจาก network
+        const res = await this.requestGet('getInitialData');
+        if (res && res.success && res.data) {
+          this.setCachedInitialData(res.data);
+          this.notifyDataSync(res.data);
+          return res;
+        }
+
+        // ลองอีกครั้งหลัง 1 วินาทีหากครั้งแรกไม่สำเร็จ
+        console.warn('[Api getInitialData] ครั้งแรกไม่สำเร็จ ลองใหม่อีกครั้ง...');
+        await new Promise(r => setTimeout(r, 1000));
+        const retryRes = await this.requestGet('getInitialData');
+        if (retryRes && retryRes.success && retryRes.data) {
+          this.setCachedInitialData(retryRes.data);
+          this.notifyDataSync(retryRes.data);
+          return retryRes;
         }
 
         // หากโหลดจากเน็ตไม่สำเร็จ แต่มีข้อมูลแคชในเครื่อง ให้ใช้แคชล่าสุด (ห้ามลบ/ห้ามแทนที่ด้วย mock ว่างเปล่า)
@@ -187,7 +191,7 @@ const Api = {
       return this.mockGet(action, params);
     }
 
-    // 1. ลองดึงข้อมูลด้วย fetch ปกติ (timeout 25 วินาที พอเพียงสำหรับ Google Apps Script)
+    // 1. ลองดึงข้อมูลด้วย fetch ปกติ (timeout 15 วินาที พอเพียงสำหรับ Google Apps Script)
     try {
       const url = new URL(apiUrl);
       url.searchParams.set('action', action);
@@ -198,7 +202,7 @@ const Api = {
       });
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 25000);
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
 
       const res = await fetch(url.toString(), {
         method: 'GET',
@@ -221,21 +225,13 @@ const Api = {
       const jsonpData = await this.fetchJsonp(apiUrl, action, params);
       return jsonpData;
     } catch (jsonpErr) {
-      console.warn(`[Api GET ${action}] JSONP ครั้งที่ 1 ขัดข้อง (${jsonpErr.message}) ลองใหม่อีกครั้ง...`);
-      // Auto-retry 1 ครั้ง
-      try {
-        await new Promise(r => setTimeout(r, 1200));
-        const retryData = await this.fetchJsonp(apiUrl, action, params);
-        return retryData;
-      } catch (retryErr) {
-        console.warn(`[Api GET ${action}] ล้มเหลว (${retryErr.message})`);
-        const cached = this.getCachedInitialData();
-        if (cached && action === 'getInitialData') {
-          return { success: true, data: cached, isStale: true };
-        }
-        // เมื่อใช้งานโหมด API จริง ห้าม fallback ไปใช้ mock ว่างเปล่า
-        return { success: false, error: 'เชื่อมต่อเซิร์ฟเวอร์ Google Sheets ไม่สำเร็จ (' + retryErr.message + ')' };
+      console.warn(`[Api GET ${action}] JSONP ขัดข้อง (${jsonpErr.message})`);
+      const cached = this.getCachedInitialData();
+      if (cached && action === 'getInitialData') {
+        return { success: true, data: cached, isStale: true };
       }
+      // เมื่อใช้งานโหมด API จริง ห้าม fallback ไปใช้ mock ว่างเปล่า
+      return { success: false, error: 'เชื่อมต่อเซิร์ฟเวอร์ Google Sheets ไม่สำเร็จ (' + jsonpErr.message + ')' };
     }
   },
 
@@ -273,11 +269,11 @@ const Api = {
         reject(new Error('JSONP script load error'));
       };
 
-      // ให้เวลา Apps Script สูงสุด 25 วินาที
+      // ให้เวลา Apps Script สูงสุด 16 วินาที
       timer = setTimeout(() => {
         cleanup();
-        reject(new Error('JSONP request timeout (25s)'));
-      }, 25000);
+        reject(new Error('JSONP request timeout (16s)'));
+      }, 16000);
 
       (document.head || document.body || document.documentElement).appendChild(script);
     });
@@ -301,8 +297,8 @@ const Api = {
     let postRes = null;
     let lastError = null;
 
-    // Helper: ยิง fetch POST พร้อม timeout 30 วินาที และ redirect: 'follow'
-    const doFetchPost = async (timeoutMs = 30000) => {
+    // Helper: ยิง fetch POST พร้อม timeout 20 วินาที และ redirect: 'follow'
+    const doFetchPost = async (timeoutMs = 20000) => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -329,17 +325,17 @@ const Api = {
 
     // 1. ลองยิงด้วย fetch POST (ครั้งที่ 1)
     try {
-      postRes = await doFetchPost(30000);
+      postRes = await doFetchPost(20000);
     } catch (err1) {
       lastError = err1;
-      console.warn(`[Api POST ${action}] Fetch ครั้งที่ 1 ขัดข้อง (${err1.message}) รอ 1.5 วินาทีแล้วลองใหม่...`);
+      console.warn(`[Api POST ${action}] Fetch ครั้งที่ 1 ขัดข้อง (${err1.message}) รอ 1 วินาทีแล้วลองใหม่...`);
     }
 
     // 2. หากครั้งที่ 1 ขัดข้อง ให้ลอง fetch POST ครั้งที่ 2
     if (!postRes) {
       try {
-        await new Promise(r => setTimeout(r, 1500));
-        postRes = await doFetchPost(30000);
+        await new Promise(r => setTimeout(r, 1000));
+        postRes = await doFetchPost(20000);
       } catch (err2) {
         lastError = err2;
         console.warn(`[Api POST ${action}] Fetch ครั้งที่ 2 ขัดข้อง (${err2.message})`);
@@ -420,6 +416,12 @@ const Api = {
           case 'getDashboard':
             resolve({ success: true, data: MockDB.getDashboard(params.branch) });
             break;
+          case 'generateReport':
+            resolve(MockDB.generateReport(params.sessionId));
+            break;
+          case 'generateAllReports':
+            resolve(MockDB.generateAllReports());
+            break;
           default:
             resolve({ success: false, error: 'Unknown action ' + action });
         }
@@ -445,6 +447,12 @@ const Api = {
             break;
           case 'deleteSession':
             resolve(MockDB.deleteSession(payload.sessionId, payload.adminId));
+            break;
+          case 'generateReport':
+            resolve(MockDB.generateReport(payload.sessionId));
+            break;
+          case 'generateAllReports':
+            resolve(MockDB.generateAllReports());
             break;
           default:
             resolve({ success: false, error: 'Unknown post action ' + action });

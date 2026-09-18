@@ -93,15 +93,20 @@ const App = {
           submitBtn.disabled = true;
           submitBtn.textContent = '⏳ กำลังบันทึกองค์ประชุม...';
         }
+        const loadToast = Toast.loading(`กำลังบันทึกและสร้างองค์ประชุม "${title}"...`);
 
         try {
           const success = await Attendance.createNewSession(title, date, scope);
+          loadToast.dismiss();
           if (success) {
             this.closeModal('new-session-modal');
             newSessionForm.reset();
             // นำทางไปยังแท็บเช็คชื่อทันที
             this.switchTab('attendance');
           }
+        } catch (err) {
+          loadToast.dismiss();
+          Toast.error('เกิดข้อผิดพลาดในการสร้างองค์ประชุม: ' + (err ? err.message : 'เครือข่ายขัดข้อง'));
         } finally {
           if (submitBtn) {
             submitBtn.disabled = false;

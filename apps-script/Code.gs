@@ -18,6 +18,26 @@ const SHEETS = {
 };
 
 /**
+ * Helper เข้าถึง Google Spreadsheet อย่างปลอดภัย รองรับทั้ง Container-bound และ Standalone Script
+ */
+function getSpreadsheet() {
+  let ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) {
+    try {
+      const props = PropertiesService.getScriptProperties();
+      const id = props ? props.getProperty('SPREADSHEET_ID') : null;
+      if (id) {
+        ss = SpreadsheetApp.openById(id);
+      }
+    } catch (e) {}
+  }
+  if (!ss) {
+    throw new Error('ไม่พบ Google Spreadsheet กรุณาเปิด Apps Script จากเมนู "ส่วนขยาย (Extensions)" > "Apps Script" ภายใน Google Sheet หรือตั้งค่า SPREADSHEET_ID');
+  }
+  return ss;
+}
+
+/**
  * =========================================================================
  * 🚀 ฟังก์ชันหลักสำหรับกดปุ่ม "เรียกใช้ (Run)":
  * 1. ใน Google Apps Script ให้เลือกฟังก์ชัน "createReportSheetNow" ในเมนู Dropdown ด้านบน
@@ -26,10 +46,7 @@ const SHEETS = {
  * =========================================================================
  */
 function createReportSheetNow() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  if (!ss) {
-    throw new Error('ไม่พบ Google Spreadsheet กรุณาเปิด Apps Script จากเมนู "ส่วนขยาย (Extensions)" > "Apps Script" ภายใน Google Sheet');
-  }
+  const ss = getSpreadsheet();
 
   // 1. ตรวจสอบ/เตรียมชีต Branches (6 สาขา)
   const bSheet = ss.getSheetByName(SHEETS.BRANCHES);
@@ -101,13 +118,30 @@ function setSheet(sheetName) {
   if (!sheetName || typeof sheetName !== 'string') {
     sheetName = SHEETS.SESSION_REPORT;
   }
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  if (!ss) {
-    throw new Error('ไม่พบ Google Spreadsheet กรุณาเปิด Apps Script จากเมนู "ส่วนขยาย" > "Apps Script" ภายใน Google Sheet');
+  // กรองอักขระต้องห้ามของ Google Sheets: \ / ? * : [ ] ' "
+  sheetName = sheetName.replace(/[\\\/:\*\?\[\]\'\"]/g, '').trim();
+  if (sheetName.length > 80) {
+    sheetName = sheetName.substring(0, 80);
   }
+  if (!sheetName) {
+    sheetName = SHEETS.SESSION_REPORT;
+  }
+
+  const ss = getSpreadsheet();
   let sheet = ss.getSheetByName(sheetName);
   if (!sheet) {
-    sheet = ss.insertSheet(sheetName);
+    try {
+      sheet = ss.insertSheet(sheetName);
+    } catch (e) {
+      sheet = ss.getSheetByName(sheetName);
+      if (!sheet) {
+        try {
+          sheet = ss.insertSheet(sheetName + '_' + Utilities.formatDate(new Date(), 'Asia/Bangkok', 'HHmmss'));
+        } catch (e2) {
+          sheet = ss.getActiveSheet();
+        }
+      }
+    }
   }
   return sheet;
 }
@@ -205,7 +239,7 @@ function updateStudentsOnly() {
  * บรรจุรายชื่อสโมสรนักศึกษาปี 2569 ครบทั้ง 6 สาขาวิชา รวม 53 คน (ไม่มี student_id ใช้ชื่อ-สกุลจริง)
  */
 function setupInitialDatabase() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = getSpreadsheet();
 
   // 1. ชีต Branches (6 สาขาวิชา)
   updateBranchesOnly();
@@ -771,7 +805,7 @@ function deleteSession(sessionId, adminId, clientTitle) {
   }
 
   try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const ss = getSpreadsheet();
 
     // 1. หาข้อมูล Session และลบแถวในชีต Sessions แบบ in-memory (เร็วและเสถียร ไม่ติด timeout)
     const sessSheet = setSheet(SHEETS.SESSIONS);
@@ -1431,9 +1465,13 @@ function renderReportToSheet(sheet, session, students, attMap, stats) {
     dataRange.setVerticalAlignment('middle');
     dataRange.setFontSize(9);
 
-    // ตั้งค่าความสูงแถว
-    for (let r = 0; r < values.length; r++) {
-      sheet.setRowHeight(6 + r, 24);
+    // ตั้งค่าความสูงแถวแบบครั้งเดียว (แทนลูป 53 ครั้ง ช่วยลดเวลาได้ 5-8 วินาที)
+    try {
+      sheet.setRowHeights(6, values.length, 24);
+    } catch (rowErr) {
+      for (let r = 0; r < values.length; r++) {
+        sheet.setRowHeight(6 + r, 24);
+      }
     }
 
     // ใส่เส้นขอบตาราง (Borders)
@@ -1463,7 +1501,7 @@ function renderReportToSheet(sheet, session, students, attMap, stats) {
   // สลับหน้าจอมาที่ชีตนี้ทันทีเพื่อให้ผู้ใช้เห็น
   try {
     sheet.activate();
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const ss = getSpreadsheet();
     if (ss) ss.setActiveSheet(sheet);
   } catch (e) {}
 }

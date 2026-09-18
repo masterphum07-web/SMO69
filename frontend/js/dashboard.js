@@ -9,6 +9,8 @@ const Dashboard = {
   isPollingActive: false,
   _isRefreshing: false,
   attendanceCache: {},
+  _currentLoadingSessionId: null,
+  _inFlightSessionPromises: {},
   branches: [],
   publicSessions: [],
   selectedPublicSessionId: null,
@@ -62,6 +64,7 @@ const Dashboard = {
       const shouldForce = forceRefresh || isBackground;
       const initRes = await Api.getInitialData(shouldForce);
       if (initRes && initRes.success && initRes.data) {
+        this._loadRetryCount = 0;
         this.applyServerData(initRes.data, initRes.isStale || initRes.fromCache);
       } else if (!isBackground && this._loadRetryCount < 1) {
         // Initial load ล้มเหลว → รอ 1.5 วิ แล้วลองอีกครั้ง (สูงสุด 1 ครั้ง)
@@ -170,6 +173,7 @@ const Dashboard = {
   async loadSelectedPublicSession(sessionId, forceFetch = false) {
     if (!sessionId) return;
     this.selectedPublicSessionId = sessionId;
+    this._currentLoadingSessionId = sessionId;
 
     const session = this.publicSessions.find(s => s.session_id === sessionId) || this.publicSessions[0];
     if (!session) return;
@@ -208,14 +212,43 @@ const Dashboard = {
       `;
     }
 
-    // 3. ดึงข้อมูลการเช็คชื่อของ session นี้
-    try {
+    // 3. Request Deduplication: หากมีคำขอ getSessionAttendance ของ session นี้ยิงค้างอยู่แล้ว ให้แชร์ผลลัพธ์ร่วมกัน
+    if (!this._inFlightSessionPromises) this._inFlightSessionPromises = {};
+    if (this._inFlightSessionPromises[session.session_id]) {
+      try {
+        const records = await this._inFlightSessionPromises[session.session_id];
+        if (this._currentLoadingSessionId === session.session_id) {
+          this.publicAttendanceRecords = records;
+          this._buildAttendanceMapAndRender(records);
+        }
+        return;
+      } catch (e) {}
+    }
+
+    const fetchPromise = (async () => {
       const attRes = await Api.requestGet('getSessionAttendance', { sessionId: session.session_id });
-      const records = (attRes && attRes.success && Array.isArray(attRes.data)) ? attRes.data : [];
-      this.publicAttendanceRecords = records;
+      return (attRes && attRes.success && Array.isArray(attRes.data)) ? attRes.data : [];
+    })();
+
+    this._inFlightSessionPromises[session.session_id] = fetchPromise;
+
+    try {
+      const records = await fetchPromise;
+      delete this._inFlightSessionPromises[session.session_id];
       this.attendanceCache[session.session_id] = records;
+
+      // CRITICAL RACE CONDITION GUARD:
+      // หากผู้ใช้สลับไปเลือกวาระอื่นแล้วขณะที่คำขอนี้กำลังโหลด ให้ทิ้งผลลัพธ์นี้ เพื่อไม่ให้ตารางแสดงข้อมูลผิดวาระ!
+      if (this._currentLoadingSessionId !== session.session_id) {
+        console.log(`[Dashboard] ข้ามการเรนเดอร์ผลเช็คชื่อที่มาทีหลังของ ${session.session_id} (ผู้ใช้เลือก ${this._currentLoadingSessionId} ไปแล้ว)`);
+        return;
+      }
+
+      this.publicAttendanceRecords = records;
       this._buildAttendanceMapAndRender(records);
     } catch (err) {
+      delete this._inFlightSessionPromises[session.session_id];
+      if (this._currentLoadingSessionId !== session.session_id) return;
       console.warn('โหลดผลเช็คชื่อวาระไม่สำเร็จ:', err);
       if (tbody) {
         tbody.innerHTML = `
@@ -252,6 +285,7 @@ const Dashboard = {
     if (icon) icon.classList.add('spin-animation');
 
     try {
+      this._loadRetryCount = 0;
       // ล้างแคชของวาระปัจจุบัน เพื่อให้ดึงผลสดใหม่จาก Google Sheets
       if (this.selectedPublicSessionId) {
         delete this.attendanceCache[this.selectedPublicSessionId];

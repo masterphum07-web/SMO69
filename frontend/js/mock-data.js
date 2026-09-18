@@ -410,12 +410,16 @@ const MockDB = {
 
   submitAttendance(sessionId, adminId) {
     const db = this.get();
-    let sess = db.sessions.find(s => s.session_id === sessionId);
+    let sess = (db.sessions || []).find(s => s.session_id === sessionId);
     if (!sess) {
-      const cached = (window.Api && typeof Api.getCachedInitialData === 'function') ? Api.getCachedInitialData() : null;
-      const cachedSess = (cached && Array.isArray(cached.sessions)) ? cached.sessions.find(s => s.session_id === sessionId) : null;
+      const cached = (typeof window !== 'undefined' && window.Api && typeof Api.getCachedInitialData === 'function') ? Api.getCachedInitialData() : null;
+      let cachedSess = (cached && Array.isArray(cached.sessions)) ? cached.sessions.find(s => s.session_id === sessionId) : null;
+      if (!cachedSess && typeof window !== 'undefined' && window.Attendance && Array.isArray(window.Attendance.sessions)) {
+        cachedSess = window.Attendance.sessions.find(s => s.session_id === sessionId);
+      }
       if (cachedSess) {
         sess = { ...cachedSess };
+        db.sessions = db.sessions || [];
         db.sessions.push(sess);
       }
     }
@@ -431,6 +435,49 @@ const MockDB = {
     db.attendance = (db.attendance || []).filter(a => a.session_id !== sessionId);
     this.save(db);
     return { success: true, message: 'ลบวาระองค์ประชุมเรียบร้อยแล้ว' };
+  },
+
+  generateReport(sessionId) {
+    const db = this.get();
+    let sess = (db.sessions || []).find(s => s.session_id === sessionId);
+    if (!sess) {
+      const cached = (typeof window !== 'undefined' && window.Api && typeof Api.getCachedInitialData === 'function') ? Api.getCachedInitialData() : null;
+      let cachedSess = (cached && Array.isArray(cached.sessions)) ? cached.sessions.find(s => s.session_id === sessionId) : null;
+      if (!cachedSess && typeof window !== 'undefined' && window.Attendance && Array.isArray(window.Attendance.sessions)) {
+        cachedSess = window.Attendance.sessions.find(s => s.session_id === sessionId);
+      }
+      if (cachedSess) {
+        sess = { ...cachedSess };
+        db.sessions = db.sessions || [];
+        db.sessions.push(sess);
+        this.save(db);
+      }
+    }
+    if (!sess) return { success: false, error: 'ไม่พบองค์ประชุม ID: ' + sessionId };
+    const cleanTitle = (sess.session_title || sess.session_id).replace(/[\[\]\*\?:\/\\\'\"]/g, '').trim().substring(0, 20);
+    return {
+      success: true,
+      sheetName: 'วาระ_' + cleanTitle,
+      message: 'สร้างแท็บจำลองเรียบร้อย'
+    };
+  },
+
+  generateAllReports() {
+    const db = this.get();
+    let count = (db.sessions || []).length;
+    if (count === 0) {
+      const cached = (typeof window !== 'undefined' && window.Api && typeof Api.getCachedInitialData === 'function') ? Api.getCachedInitialData() : null;
+      if (cached && Array.isArray(cached.sessions)) {
+        count = cached.sessions.length;
+      } else if (typeof window !== 'undefined' && window.Attendance && Array.isArray(window.Attendance.sessions)) {
+        count = window.Attendance.sessions.length;
+      }
+    }
+    return {
+      success: true,
+      count: count,
+      message: 'สร้างแท็บจำลองครบทุกวาระแล้ว'
+    };
   },
 
   getLeaderboard() {

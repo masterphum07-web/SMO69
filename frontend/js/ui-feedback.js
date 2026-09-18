@@ -390,10 +390,17 @@
   window.AppModal = AppModal;
 
   // Polyfill / Safety Net:
-  // หากมีโค้ดส่วนไหนหลงเรียก window.alert แบบเดิม ให้แปลงเป็น Toast สวยๆ อัตโนมัติ
-  // ป้องกันเบราว์เซอร์เด้ง Native Alert สีเทา และตัดปัญหาผู้ใช้กด "ระงับกล่องโต้ตอบ" 100%
+  // หากมีโค้ดส่วนไหนหลงเรียก window.alert หรือ window.confirm แบบเดิม ให้แปลงเป็น Toast สวยๆ อัตโนมัติ
+  // ป้องกันเบราว์เซอร์เด้ง Native Alert/Confirm สีเทา และตัดปัญหาผู้ใช้กด "ระงับกล่องโต้ตอบ" 100%
   window.alert = function(msg) {
     Toast.show(String(msg), 'info', 4500);
   };
 
+  window.confirm = function(msg) {
+    console.warn('[Safety Net] native confirm() intercepted to prevent browser dialog suppression. Use AppModal.confirm instead.');
+    Toast.warning(String(msg), 4000);
+    return true;
+  };
+
 })(window);
+

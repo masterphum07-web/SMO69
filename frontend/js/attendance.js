@@ -14,6 +14,7 @@ const Attendance = {
   searchQuery: '',
   draftTimeout: null,
   isSaving: false,
+  _pendingSave: false,
 
   async init() {
     // 1. ลงทะเบียนรับข้อมูลสดใหม่จาก Server เสมอ
@@ -33,17 +34,31 @@ const Attendance = {
       this.students = students;
     }
     if (Array.isArray(sessions)) {
-      this.sessions = sessions;
-      // ตรวจสอบว่าวาระปัจจุบันที่เลือกไว้ ยังมีอยู่ใน sessions ใหม่หรือไม่ (ถ้าถูกลบในชีต ให้สลับไปวาระแรก)
+      const oldKeys = (this.sessions || []).map(s => `${s.session_id}:${s.status}`).join(',');
+
+      // คงวาระที่ผู้ใช้เพิ่งสร้างใหม่ในเครื่องไว้ ไม่ให้โดนการตอบสนองที่ล่าช้าของเซิร์ฟเวอร์ลบทับ
+      const locallyCreated = (this.sessions || []).find(s => s.session_id === this.currentSessionId);
+      let mergedSessions = [...sessions];
+      if (locallyCreated && !sessions.some(s => s.session_id === locallyCreated.session_id)) {
+        mergedSessions.unshift(locallyCreated);
+      }
+      this.sessions = mergedSessions;
+      const newKeys = this.sessions.map(s => `${s.session_id}:${s.status}`).join(',');
+
+      // ตรวจสอบว่าวาระปัจจุบันที่เลือกไว้ ยังมีอยู่ใน sessions หรือไม่
       const stillValid = this.currentSessionId && this.sessions.some(s => s.session_id === this.currentSessionId);
       if (!stillValid) {
         this.currentSessionId = this.sessions.length > 0 ? this.sessions[0].session_id : null;
         this.currentSession = this.sessions.length > 0 ? this.sessions[0] : null;
         this.records = {};
+        this.populateSessions(this.sessions);
       } else {
         this.currentSession = this.sessions.find(s => s.session_id === this.currentSessionId) || null;
+        // หากรายการหรือสถานะมีการเปลี่ยนแปลงจริง ให้อัปเดต dropdown โดยห้ามล้าง records ที่ผู้ใช้กำลังเช็ค!
+        if (oldKeys !== newKeys) {
+          this.updateSessionSelectOptions();
+        }
       }
-      this.populateSessions(this.sessions);
     }
   },
 
@@ -123,6 +138,24 @@ const Attendance = {
     } else {
       this.render();
     }
+  },
+
+  updateSessionSelectOptions() {
+    const select = document.getElementById('session-select');
+    if (!select || !Array.isArray(this.sessions)) return;
+
+    select.innerHTML = '';
+    this.sessions.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s.session_id;
+      const statusBadge = s.status === 'submitted' ? '✅ [สรุปผลแล้ว]' : '📝 [แบบร่าง]';
+      opt.textContent = `${statusBadge} ${s.session_title} (${s.session_date})`;
+      if (s.session_id === this.currentSessionId) {
+        opt.selected = true;
+      }
+      select.appendChild(opt);
+    });
+    this.updateSessionNotice();
   },
 
   updateSessionNotice() {
@@ -242,6 +275,11 @@ const Attendance = {
       return;
     }
 
+    if (this.isSaving) {
+      this._pendingSave = true;
+      return;
+    }
+
     const user = Auth.getUser();
     const adminId = user ? user.adminId : 'admin01';
 
@@ -263,12 +301,20 @@ const Attendance = {
     }
 
     this.isSaving = true;
-    const res = await Api.requestPost('saveAttendanceDraft', {
-      sessionId: this.currentSessionId,
-      records: recordsArray,
-      adminId: adminId
-    });
-    this.isSaving = false;
+    let res = null;
+    try {
+      res = await Api.requestPost('saveAttendanceDraft', {
+        sessionId: this.currentSessionId,
+        records: recordsArray,
+        adminId: adminId
+      });
+    } finally {
+      this.isSaving = false;
+      if (this._pendingSave) {
+        this._pendingSave = false;
+        setTimeout(() => this.saveDraft(false), 300);
+      }
+    }
 
     // อัปเดตแคชหน้าแรกด้วย เพื่อให้เมื่อกดดูหน้าแรกจะเห็นข้อมูลสดใหม่ทันที 0ms
     if (window.Dashboard && Dashboard.attendanceCache) {
@@ -324,22 +370,31 @@ const Attendance = {
     try {
       // บันทึกสถานะล่าสุดก่อน
       await this.saveDraft(false);
-      const res = await Api.requestGet('generateReport', { sessionId: this.currentSessionId });
+      const res = await Api.requestPost('generateReport', { sessionId: this.currentSessionId });
       toast.dismiss();
       if (res && res.success) {
         const sessionTitle = this.currentSession ? this.currentSession.session_title : '';
-        const cleanName = sessionTitle ? `วาระ_${sessionTitle.substring(0, 20)}` : 'แท็บประจำวาระ';
+        const cleanName = res.sheetName || (sessionTitle ? `วาระ_${sessionTitle.substring(0, 20)}` : 'แท็บประจำวาระ');
         await AppModal.alert({
-          title: 'สร้างรายงานใน Google Sheets สำเร็จ',
+          title: 'สร้างรายงานใน Google Sheets สำเร็จ 🎉',
           message: `✅ สร้าง/อัปเดตแท็บใน Google Sheets เรียบร้อยแล้ว!\n\n📑 แท็บเฉพาะของวาระนี้: "${cleanName}" (แยกแท็บถาวร ไม่ทับกับวาระอื่น)\n📊 แท็บสรุปล่าสุด: "บันทึกผลการเช็คชื่อ"\n\nคุณสามารถเปิดดูใน Google Sheets ได้ทันทีครับ`,
           type: 'success'
         });
       } else {
-        Toast.warning('⚠️ บันทึกข้อมูลเรียบร้อยแล้ว หากยังไม่เห็นแท็บใหม่ กรุณาเปิด Google Sheets แล้วกดรีเฟรช (F5) ครับ');
+        const errMsg = (res && res.error) ? res.error : 'ไม่สามารถสร้างแท็บรายงานได้ กรุณาลองใหม่อีกครั้ง';
+        await AppModal.alert({
+          title: 'ไม่สามารถสร้างแท็บรายงานได้',
+          message: `⚠️ เกิดข้อผิดพลาด: ${errMsg}\n\nคำแนะนำ: กรุณาตรวจสอบว่าเลือกองค์ประชุมถูกต้อง และสัญญาณอินเทอร์เน็ตเชื่อมต่ออยู่ครับ`,
+          type: 'error'
+        });
       }
     } catch (err) {
       toast.dismiss();
-      Toast.error('⚠️ เกิดข้อผิดพลาด: ' + err.message);
+      await AppModal.alert({
+        title: 'เกิดข้อผิดพลาดในการเชื่อมต่อ',
+        message: '⚠️ ' + (err.message || 'โปรดตรวจสอบการเชื่อมต่ออินเทอร์เน็ต'),
+        type: 'error'
+      });
     } finally {
       if (btn) {
         btn.disabled = false;
@@ -377,36 +432,47 @@ const Attendance = {
     });
     if (!confirmed) return;
 
-    const toast = Toast.loading('กำลังส่งสรุปผลและสร้างแท็บรายงานใน Google Sheets...');
+    const toast = Toast.loading('กำลังบันทึกข้อมูลล่าสุด...');
 
-    // บันทึก draft ล่าสุดก่อน
-    await this.saveDraft(false);
+    try {
+      // บันทึก draft ล่าสุดก่อน
+      await this.saveDraft(false);
+      toast.update({ message: 'กำลังส่งสรุปผลและสร้างแท็บรายงานใน Google Sheets...', type: 'loading' });
 
-    const user = Auth.getUser();
-    const adminId = user ? user.adminId : 'admin01';
+      const user = Auth.getUser();
+      const adminId = user ? user.adminId : 'admin01';
 
-    const res = await Api.requestPost('submitAttendance', {
-      sessionId: this.currentSessionId,
-      adminId: adminId
-    });
-
-    toast.dismiss();
-
-    if (res && res.success) {
-      await AppModal.alert({
-        title: 'ส่งสรุปผลสำเร็จ 🎉',
-        message: '🎉 ส่งสรุปผลและปิดรอบการเช็คชื่อสำเร็จแล้ว!\nสถิติและแท็บบันทึกผลถูกอัปเดตลง Google Sheets เรียบร้อย',
-        type: 'success'
+      const res = await Api.requestPost('submitAttendance', {
+        sessionId: this.currentSessionId,
+        adminId: adminId
       });
-      this.currentSession.status = 'submitted';
-      await this.loadSessionsList();
-      if (window.Dashboard && typeof Dashboard.loadPublicStats === 'function') {
-        Dashboard.loadPublicStats(true);
+
+      toast.dismiss();
+
+      if (res && res.success) {
+        await AppModal.alert({
+          title: 'ส่งสรุปผลสำเร็จ 🎉',
+          message: '🎉 ส่งสรุปผลและปิดรอบการเช็คชื่อสำเร็จแล้ว!\nสถิติและแท็บบันทึกผลถูกอัปเดตลง Google Sheets เรียบร้อย',
+          type: 'success'
+        });
+        this.currentSession.status = 'submitted';
+        await this.loadSessionsList();
+        if (window.Dashboard && typeof Dashboard.loadPublicStats === 'function') {
+          Dashboard.loadPublicStats(true);
+        }
+      } else {
+        const errMsg = (res && res.error) ? res.error : 'ไม่สามารถส่งได้ กรุณาตรวจสอบสัญญาณอินเทอร์เน็ต';
+        await AppModal.alert({
+          title: 'ส่งสรุปผลไม่สำเร็จ',
+          message: `⚠️ เกิดข้อผิดพลาด: ${errMsg}\n\n(หากระบบแจ้งว่าไม่พบองค์ประชุม กรุณากดปุ่ม "🔄 ซิงค์" ด้านบนเพื่อดึงวาระล่าสุดจาก Google Sheets แล้วลองใหม่อีกครั้ง)`,
+          type: 'error'
+        });
       }
-    } else {
+    } catch (err) {
+      toast.dismiss();
       await AppModal.alert({
-        title: 'ส่งสรุปผลไม่สำเร็จ',
-        message: 'เกิดข้อผิดพลาด: ' + (res ? res.error : 'ไม่สามารถส่งได้ กรุณาตรวจสอบสัญญาณอินเทอร์เน็ต'),
+        title: 'การเชื่อมต่อขัดข้อง',
+        message: '⚠️ ไม่สามารถติดต่อเซิร์ฟเวอร์ได้: ' + (err.message || 'โปรดตรวจสอบการเชื่อมต่อ'),
         type: 'error'
       });
     }
@@ -438,9 +504,21 @@ const Attendance = {
       // 3. แสดงผลใน Dropdown และหน้าตารางทันที (พร้อมเช็คชื่อได้เลย!)
       this.populateSessions(this.sessions);
 
-      // 4. โหลดสถิติ Dashboard ใหม่ใน background
-      if (window.Dashboard && typeof Dashboard.loadPublicStats === 'function') {
-        Dashboard.loadPublicStats(true);
+      // 4. ซิงค์ลงใน Api Cache และ Dashboard ทันที
+      if (window.Api && Api.cache && Array.isArray(Api.cache.sessions)) {
+        Api.cache.sessions = [newSession, ...Api.cache.sessions.filter(s => s.session_id !== newSession.session_id)];
+      }
+      if (window.Dashboard) {
+        if (Array.isArray(Dashboard.publicSessions)) {
+          Dashboard.publicSessions = [newSession, ...Dashboard.publicSessions.filter(s => s.session_id !== newSession.session_id)];
+          Dashboard.selectedPublicSessionId = newSession.session_id;
+          if (typeof Dashboard.populatePublicSessionSelect === 'function') {
+            Dashboard.populatePublicSessionSelect();
+          }
+        }
+        if (typeof Dashboard.loadPublicStats === 'function') {
+          Dashboard.loadPublicStats(true);
+        }
       }
 
       Toast.success(`✅ สร้างองค์ประชุม "${newSession.session_title}" สำเร็จแล้ว! พร้อมเริ่มเช็คชื่อได้ทันที`);

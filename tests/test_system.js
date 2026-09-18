@@ -339,6 +339,10 @@ async function runUiFeedbackTests() {
   okBtn.click();
   await alertPromise;
   assert(true, 'AppModal.alert resolves smoothly on OK click');
+
+  // Test window.confirm safety net
+  const confirmResult = win.confirm('ทดสอบ intercept confirm');
+  assert(confirmResult === true, 'window.confirm safely intercepted without popup');
 }
 
 // =============================================================
@@ -438,6 +442,55 @@ async function runDashboardPublicViewTests() {
   assert(win.Dashboard._isRefreshing === false, 'Manual refresh resets _isRefreshing flag');
   assert(refreshBtn.disabled === false, 'Refresh button is re-enabled');
   assert(!refreshIcon.classList.contains('spin-animation'), 'Spin animation removed after refresh');
+
+  // 5. Test Race Condition Protection during session switching
+  // Simulate SESS-001 taking 120ms, while user quickly switches to SESS-002 taking 20ms
+  delete win.Dashboard.attendanceCache['SESS-001'];
+  delete win.Dashboard.attendanceCache['SESS-002'];
+
+  win.Api.requestGet = async function(action, params = {}) {
+    if (action === 'getSessionAttendance') {
+      if (params.sessionId === 'SESS-001') {
+        await new Promise(r => setTimeout(r, 120));
+        return {
+          success: true,
+          data: [{ full_name: 'นายทดสอบ หนึ่ง', status: 'ขาด' }]
+        };
+      }
+      if (params.sessionId === 'SESS-002') {
+        await new Promise(r => setTimeout(r, 20));
+        return {
+          success: true,
+          data: [{ full_name: 'นายทดสอบ หนึ่ง', status: 'มา' }]
+        };
+      }
+    }
+    return { success: true, data: [] };
+  };
+
+  const p1 = win.Dashboard.loadSelectedPublicSession('SESS-001');
+  const p2 = win.Dashboard.loadSelectedPublicSession('SESS-002');
+  await Promise.all([p1, p2]);
+
+  assert(win.Dashboard.selectedPublicSessionId === 'SESS-002', 'User selected session remains SESS-002');
+  assert(win.Dashboard.publicAttendanceMap['นายทดสอบ หนึ่ง'] === 'มา', 'SESS-002 data is rendered (slow SESS-001 response did NOT overwrite it)');
+
+  // 6. Test Request Deduplication
+  let dedupCallCount = 0;
+  win.Api.requestGet = async function(action, params = {}) {
+    if (action === 'getSessionAttendance') {
+      dedupCallCount++;
+      await new Promise(r => setTimeout(r, 40));
+      return { success: true, data: [{ full_name: 'นายทดสอบ หนึ่ง', status: 'ลา' }] };
+    }
+    return { success: true, data: [] };
+  };
+  delete win.Dashboard.attendanceCache['SESS-002'];
+  const callA = win.Dashboard.loadSelectedPublicSession('SESS-002');
+  const callB = win.Dashboard.loadSelectedPublicSession('SESS-002');
+  const callC = win.Dashboard.loadSelectedPublicSession('SESS-002', true);
+  await Promise.all([callA, callB, callC]);
+  assert(dedupCallCount === 1, 'In-flight getSessionAttendance calls are deduplicated even with forceFetch (only 1 network call)');
 }
 
 // =============================================================
@@ -466,6 +519,11 @@ async function runApiAndAttendanceTests() {
   }
 
   assert(!win.Config.isMockMode(), 'Config is in Live API mode (not mock mode)');
+
+  // Mock fetchJsonp to fail fast in network test
+  win.Api.fetchJsonp = async function() {
+    throw new Error('Network error (fast simulated test)');
+  };
 
   // Simulate network failure on fetch
   let fetchAttempts = 0;
@@ -510,6 +568,56 @@ async function runApiAndAttendanceTests() {
   assert(toastContainer.children.length > 0, 'saveDraft(true) displayed feedback toast');
   const lastToast = toastContainer.children[toastContainer.children.length - 1];
   assert(lastToast.className.includes('toast-success'), 'saveDraft(true) toast shows success state');
+
+  // 3. Test Auto-Save Debounce Queue (_pendingSave)
+  let saveDraftCount = 0;
+  win.Api.requestPost = async function(action, payload) {
+    if (action === 'saveAttendanceDraft') {
+      saveDraftCount++;
+      await new Promise(r => setTimeout(r, 60));
+      return { success: true, message: 'บันทึกสำเร็จ' };
+    }
+    return { success: true };
+  };
+
+  const draft1 = win.Attendance.saveDraft(false);
+  const draft2 = win.Attendance.saveDraft(false);
+  assert(win.Attendance._pendingSave === true, '_pendingSave is true when second save is triggered during in-flight save');
+  await draft1;
+  await new Promise(r => setTimeout(r, 380));
+  assert(saveDraftCount === 2, 'Queued pending save executed automatically after first save completed');
+
+  // 4. Test syncSessionsFromServer preserves uncommitted active records
+  win.Attendance.records = { 'นักศึกษา 1': 'ขาด', 'นักศึกษา 2': 'ลา' };
+  win.Attendance.syncSessionsFromServer([
+    { session_id: 'SESS-001', session_title: 'วาระที่ 1', status: 'draft' }
+  ], win.Attendance.students, []);
+
+  assert(win.Attendance.records['นักศึกษา 1'] === 'ขาด', 'syncSessionsFromServer does NOT wipe uncommitted records');
+  assert(win.Attendance.records['นักศึกษา 2'] === 'ลา', 'syncSessionsFromServer preserves all active records');
+
+  // 5. Test MockDB report generation methods
+  // 5.1 Fallback to Attendance.sessions / Api cache
+  const mockRep = win.MockDB.generateReport('SESS-001');
+  assert(mockRep.success === true, 'MockDB.generateReport succeeds via fallback');
+  assert(mockRep.sheetName.includes('วาระ_'), 'MockDB.generateReport returns sheetName');
+
+  // 5.2 Direct local session in MockDB
+  const createdSess = win.MockDB.createSession('วาระพิเศษประจำเดือน', '2026-09-20', 'ALL', 'admin01');
+  assert(createdSess.success === true, 'MockDB.createSession succeeds');
+  const directRep = win.MockDB.generateReport(createdSess.session.session_id);
+  assert(directRep.success === true, 'MockDB.generateReport succeeds for directly created session');
+  assert(directRep.sheetName.includes('วาระพิเศษ'), 'MockDB.generateReport sheetName has clean title');
+
+  // 5.3 Non-existent session returns error
+  const notFoundRep = win.MockDB.generateReport('SESS-NON-EXISTENT-999');
+  assert(notFoundRep.success === false, 'MockDB.generateReport returns false for non-existent session');
+  assert(notFoundRep.error.includes('ไม่พบองค์ประชุม'), 'MockDB.generateReport returns informative error');
+
+  // 5.4 generateAllReports
+  const mockAllRep = win.MockDB.generateAllReports();
+  assert(mockAllRep.success === true, 'MockDB.generateAllReports succeeds');
+  assert(mockAllRep.count >= 1, `MockDB.generateAllReports count >= 1 (got: ${mockAllRep.count})`);
 }
 
 // -------------------------------------------------------------
