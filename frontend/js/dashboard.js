@@ -7,6 +7,8 @@
 const Dashboard = {
   pollingTimer: null,
   isPollingActive: false,
+  _isRefreshing: false,
+  attendanceCache: {},
   branches: [],
   publicSessions: [],
   selectedPublicSessionId: null,
@@ -34,7 +36,7 @@ const Dashboard = {
     if (this.pollingTimer) clearInterval(this.pollingTimer);
     const interval = Config.getPollInterval();
     this.pollingTimer = setInterval(async () => {
-      if (!document.hidden) {
+      if (!document.hidden && !this._isRefreshing) {
         await this.loadPublicStats(true, true);
       }
     }, interval);
@@ -93,12 +95,24 @@ const Dashboard = {
     // 2. เติมตัวเลือก Dropdown วาระหน้าแรก
     this.populatePublicSessionSelect();
 
-    // 3. กำหนด Session ที่เลือก (เริ่มต้นเป็นวาระแรก/ล่าสุด หรือถ้าอันเดิมถูกลบไปแล้ว ให้สลับไปวาระแรก)
+    // 3. กำหนด Session ที่เลือก (คงวาระที่ผู้ใช้เลือกไว้เสมอ ไม่ถูก polling รีเซ็ตทับ!)
     if (this.publicSessions.length > 0) {
-      if (!this.selectedPublicSessionId || !this.publicSessions.some(s => s.session_id === this.selectedPublicSessionId)) {
+      const sessionStillExists = this.selectedPublicSessionId && this.publicSessions.some(s => s.session_id === this.selectedPublicSessionId);
+      if (!sessionStillExists) {
         this.selectedPublicSessionId = this.publicSessions[0].session_id;
       }
-      this.loadSelectedPublicSession(this.selectedPublicSessionId);
+      const select = document.getElementById('public-session-select');
+      if (select && this.selectedPublicSessionId) {
+        select.value = this.selectedPublicSessionId;
+      }
+
+      // โหลดเฉพาะเมื่อยังไม่มีแคช หรือต้องการรีเฟรช
+      if (!this.attendanceCache[this.selectedPublicSessionId]) {
+        this.loadSelectedPublicSession(this.selectedPublicSessionId);
+      } else {
+        const sess = this.publicSessions.find(s => s.session_id === this.selectedPublicSessionId) || this.publicSessions[0];
+        this.renderCurrentSessionBanner(sess);
+      }
     } else {
       this.selectedPublicSessionId = null;
       this.renderNoSessionsState();
@@ -141,6 +155,10 @@ const Dashboard = {
       }
       select.appendChild(opt);
     });
+
+    if (this.selectedPublicSessionId) {
+      select.value = this.selectedPublicSessionId;
+    }
   },
 
   async onPublicSessionChange(sessionId) {
@@ -149,7 +167,7 @@ const Dashboard = {
     }
   },
 
-  async loadSelectedPublicSession(sessionId) {
+  async loadSelectedPublicSession(sessionId, forceFetch = false) {
     if (!sessionId) return;
     this.selectedPublicSessionId = sessionId;
 
@@ -158,23 +176,98 @@ const Dashboard = {
 
     this.renderCurrentSessionBanner(session);
 
-    // ดึงข้อมูลการเช็คชื่อของ session นี้
-    const attRes = await Api.requestGet('getSessionAttendance', { sessionId: session.session_id });
-    const records = (attRes && attRes.success && Array.isArray(attRes.data)) ? attRes.data : [];
-    this.publicAttendanceRecords = records;
+    const heading = document.getElementById('public-table-heading');
+    if (heading) heading.textContent = `วาระ: ${session.session_title}`;
 
-    // สร้าง Map โดยใช้ชื่อ-สกุลจริง (และ student_id เผื่อไว้)
+    const select = document.getElementById('public-session-select');
+    if (select && select.value !== session.session_id) {
+      select.value = session.session_id;
+    }
+
+    // 1. แคชในหน่วยความจำ: หากมีข้อมูลอยู่แล้วและไม่บังคับดึงใหม่ ให้แสดงทันที 0ms (ไม่กระตุก ไม่ค้าง)
+    if (!this.attendanceCache) this.attendanceCache = {};
+    const cachedRecords = this.attendanceCache[session.session_id];
+
+    if (cachedRecords && !forceFetch) {
+      this.publicAttendanceRecords = cachedRecords;
+      this._buildAttendanceMapAndRender(cachedRecords);
+      return;
+    }
+
+    // 2. แสดงสถานะกำลังโหลด (Skeleton / Spinner) ในตารางทันที เพื่อไม่ให้ค้างแสดงข้อมูลของวาระเดิม
+    const tbody = document.getElementById('public-attendance-tbody');
+    if (tbody) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="3" class="text-center" style="padding: 3rem 1rem; color: var(--navy-800);">
+            <div class="loading-spinner-ring" style="margin: 0 auto 0.75rem auto;"></div>
+            <div style="font-weight: 600; font-size: 0.95rem; color: var(--navy-900);">กำลังโหลดผลการเช็คชื่อ...</div>
+            <div class="text-xs text-muted" style="margin-top: 0.35rem;">วาระ: "${session.session_title}" (${session.session_date})</div>
+          </td>
+        </tr>
+      `;
+    }
+
+    // 3. ดึงข้อมูลการเช็คชื่อของ session นี้
+    try {
+      const attRes = await Api.requestGet('getSessionAttendance', { sessionId: session.session_id });
+      const records = (attRes && attRes.success && Array.isArray(attRes.data)) ? attRes.data : [];
+      this.publicAttendanceRecords = records;
+      this.attendanceCache[session.session_id] = records;
+      this._buildAttendanceMapAndRender(records);
+    } catch (err) {
+      console.warn('โหลดผลเช็คชื่อวาระไม่สำเร็จ:', err);
+      if (tbody) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="3" class="text-center text-danger" style="padding: 2.5rem 1rem;">
+              ⚠️ ไม่สามารถดึงข้อมูลผลการเช็คชื่อได้: ${err.message || 'โปรดตรวจสอบการเชื่อมต่อ'}
+            </td>
+          </tr>
+        `;
+      }
+    }
+  },
+
+  _buildAttendanceMapAndRender(records) {
     this.publicAttendanceMap = {};
-    records.forEach(r => {
+    (records || []).forEach(r => {
       const key = r.full_name || r.student_id;
       if (key) {
         this.publicAttendanceMap[key] = r.status;
       }
     });
 
-    // คำนวณสถิติ Card และเรนเดอร์ตาราง
     this.updatePublicStatCards();
     this.renderPublicTable();
+  },
+
+  async manualRefresh() {
+    if (this._isRefreshing) return;
+    this._isRefreshing = true;
+
+    const btn = document.getElementById('btn-public-refresh');
+    const icon = document.getElementById('public-refresh-icon');
+    if (btn) btn.disabled = true;
+    if (icon) icon.classList.add('spin-animation');
+
+    try {
+      // ล้างแคชของวาระปัจจุบัน เพื่อให้ดึงผลสดใหม่จาก Google Sheets
+      if (this.selectedPublicSessionId) {
+        delete this.attendanceCache[this.selectedPublicSessionId];
+      }
+      await this.loadPublicStats(false, true);
+      if (this.selectedPublicSessionId) {
+        await this.loadSelectedPublicSession(this.selectedPublicSessionId, true);
+      }
+      Toast.success('✓ อัปเดตข้อมูลล่าสุดจาก Google Sheets สำเร็จ');
+    } catch (err) {
+      Toast.error('รีเฟรชข้อมูลไม่สำเร็จ: ' + (err.message || 'เครือข่ายขัดข้อง'));
+    } finally {
+      this._isRefreshing = false;
+      if (btn) btn.disabled = false;
+      if (icon) icon.classList.remove('spin-animation');
+    }
   },
 
   renderCurrentSessionBanner(session) {
@@ -545,7 +638,15 @@ const Dashboard = {
   async deleteAdminSession(sessionId, title) {
     if (!sessionId) return;
     const confirmMsg = `⚠️ ยืนยันการลบวาระองค์ประชุมนี้หรือไม่?\n\n📌 หัวข้อ: "${title}" (ID: ${sessionId})\n\nเมื่อลบแล้ว:\n• รายการวาระจะถูกลบออกจากระบบและ Google Sheets\n• ประวัติการเช็คชื่อทั้งหมดของวาระนี้จะถูกลบ`;
-    if (!confirm(confirmMsg)) return;
+    
+    const confirmed = await AppModal.confirm({
+      title: 'ยืนยันการลบวาระองค์ประชุม',
+      message: confirmMsg,
+      confirmText: 'ลบวาระ',
+      cancelText: 'ยกเลิก',
+      type: 'danger'
+    });
+    if (!confirmed) return;
 
     const user = Auth.getUser();
     const adminId = user ? user.adminId : 'admin01';
@@ -557,12 +658,12 @@ const Dashboard = {
         title: title
       });
       if (res && res.success) {
-        alert(`✅ ลบวาระ "${title}" เรียบร้อยแล้ว!`);
+        Toast.success(`✅ ลบวาระ "${title}" เรียบร้อยแล้ว!`);
       } else {
-        alert(`ลบวาระ "${title}" ออกจากหน้าเว็บและแคชเรียบร้อยแล้ว`);
+        Toast.success(`ลบวาระ "${title}" ออกจากหน้าเว็บและแคชเรียบร้อยแล้ว`);
       }
     } catch (e) {
-      alert(`ลบวาระ "${title}" ออกจากหน้าเว็บและแคชเรียบร้อยแล้ว`);
+      Toast.success(`ลบวาระ "${title}" ออกจากหน้าเว็บและแคชเรียบร้อยแล้ว`);
     }
 
     // ล้างออกจาก UI และแคชทันที

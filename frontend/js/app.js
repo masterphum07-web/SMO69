@@ -62,7 +62,7 @@ const App = {
         if (res.success) {
           this.closeModal('login-modal');
           this.updateAuthUI();
-          alert(`ยินดีต้อนรับคุณ ${res.user.name} (${res.user.role === 'admin' ? 'แอดมิน' : 'ผู้เช็คชื่อ'})`);
+          Toast.success(`ยินดีต้อนรับคุณ ${res.user.name} (${res.user.role === 'admin' ? 'แอดมิน' : 'ผู้เช็คชื่อ'})`);
           this.switchTab('attendance');
         } else {
           if (errEl) {
@@ -83,7 +83,7 @@ const App = {
         const scope = document.getElementById('new-session-scope').value;
 
         if (!title || !date) {
-          alert('กรุณากรอกชื่อหัวข้อและวันที่');
+          Toast.warning('กรุณากรอกชื่อหัวข้อและวันที่');
           return;
         }
 
@@ -124,8 +124,8 @@ const App = {
 
         this.updateConnectionStatusBadge();
         this.closeModal('settings-modal');
-        alert('บันทึกการตั้งค่าเรียบร้อยแล้ว');
-        window.location.reload();
+        Toast.success('บันทึกการตั้งค่าเรียบร้อยแล้ว');
+        setTimeout(() => window.location.reload(), 600);
       });
     }
 
@@ -161,7 +161,11 @@ const App = {
     }
 
     if (tabName === 'admin' && !Auth.isAdmin()) {
-      alert('เฉพาะบัญชีระดับแอดมิน (Admin) เท่านั้นที่สามารถเข้าถึงส่วนนี้ได้');
+      AppModal.alert({
+        title: 'จำกัดสิทธิ์การเข้าถึง',
+        message: 'เฉพาะบัญชีระดับแอดมิน (Admin) เท่านั้นที่สามารถเข้าถึงส่วนนี้ได้',
+        type: 'warning'
+      });
       return;
     }
 
@@ -275,7 +279,7 @@ const App = {
     const url = document.getElementById('setting-api-url').value;
     const testResultEl = document.getElementById('test-api-result');
     if (!url) {
-      alert('กรุณากรอก URL Web App ก่อนทดสอบ');
+      Toast.warning('กรุณากรอก URL Web App ก่อนทดสอบ');
       return;
     }
     if (testResultEl) {

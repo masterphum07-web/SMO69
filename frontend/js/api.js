@@ -187,7 +187,7 @@ const Api = {
       return this.mockGet(action, params);
     }
 
-    // 1. ลองดึงข้อมูลด้วย fetch ปกติ (timeout 12 วินาที พอเพียงสำหรับ Google Apps Script)
+    // 1. ลองดึงข้อมูลด้วย fetch ปกติ (timeout 25 วินาที พอเพียงสำหรับ Google Apps Script)
     try {
       const url = new URL(apiUrl);
       url.searchParams.set('action', action);
@@ -198,12 +198,13 @@ const Api = {
       });
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 12000);
+      const timeoutId = setTimeout(() => controller.abort(), 25000);
 
       const res = await fetch(url.toString(), {
         method: 'GET',
-        signal: controller.signal,
-        redirect: 'follow'
+        mode: 'cors',
+        redirect: 'follow',
+        signal: controller.signal
       });
       clearTimeout(timeoutId);
 
@@ -223,16 +224,17 @@ const Api = {
       console.warn(`[Api GET ${action}] JSONP ครั้งที่ 1 ขัดข้อง (${jsonpErr.message}) ลองใหม่อีกครั้ง...`);
       // Auto-retry 1 ครั้ง
       try {
-        await new Promise(r => setTimeout(r, 1000));
+        await new Promise(r => setTimeout(r, 1200));
         const retryData = await this.fetchJsonp(apiUrl, action, params);
         return retryData;
       } catch (retryErr) {
-        console.warn(`[Api GET ${action}] JSONP ล้มเหลว (${retryErr.message}) สลับไปใช้ข้อมูลสำรอง`);
+        console.warn(`[Api GET ${action}] ล้มเหลว (${retryErr.message})`);
         const cached = this.getCachedInitialData();
         if (cached && action === 'getInitialData') {
           return { success: true, data: cached, isStale: true };
         }
-        return this.mockGet(action, params);
+        // เมื่อใช้งานโหมด API จริง ห้าม fallback ไปใช้ mock ว่างเปล่า
+        return { success: false, error: 'เชื่อมต่อเซิร์ฟเวอร์ Google Sheets ไม่สำเร็จ (' + retryErr.message + ')' };
       }
     }
   },
@@ -277,7 +279,7 @@ const Api = {
         reject(new Error('JSONP request timeout (25s)'));
       }, 25000);
 
-      document.head.appendChild(script);
+      (document.head || document.body || document.documentElement).appendChild(script);
     });
   },
 
@@ -297,29 +299,55 @@ const Api = {
     };
 
     let postRes = null;
+    let lastError = null;
 
-    // 1. ลองยิงด้วย fetch POST (timeout 12 วินาที)
-    try {
+    // Helper: ยิง fetch POST พร้อม timeout 30 วินาที และ redirect: 'follow'
+    const doFetchPost = async (timeoutMs = 30000) => {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 12000);
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-      const res = await fetch(apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify(bodyData),
-        signal: controller.signal
-      });
-      clearTimeout(timeoutId);
+      try {
+        const res = await fetch(apiUrl, {
+          method: 'POST',
+          mode: 'cors',
+          redirect: 'follow',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(bodyData),
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
 
-      if (res.ok) {
-        postRes = await res.json();
+        if (res.ok) {
+          return await res.json();
+        }
+        throw new Error(`HTTP Error ${res.status}: ${res.statusText}`);
+      } catch (err) {
+        clearTimeout(timeoutId);
+        throw err;
       }
-    } catch (err) {
-      // Fetch ขัดข้อง สลับไปใช้ JSONP สำรอง
+    };
+
+    // 1. ลองยิงด้วย fetch POST (ครั้งที่ 1)
+    try {
+      postRes = await doFetchPost(30000);
+    } catch (err1) {
+      lastError = err1;
+      console.warn(`[Api POST ${action}] Fetch ครั้งที่ 1 ขัดข้อง (${err1.message}) รอ 1.5 วินาทีแล้วลองใหม่...`);
     }
 
-    // 2. ใช้ JSONP สำรอง (รับประกัน 100% บายพาส CORS Redirect ของ Google Apps Script)
+    // 2. หากครั้งที่ 1 ขัดข้อง ให้ลอง fetch POST ครั้งที่ 2
     if (!postRes) {
+      try {
+        await new Promise(r => setTimeout(r, 1500));
+        postRes = await doFetchPost(30000);
+      } catch (err2) {
+        lastError = err2;
+        console.warn(`[Api POST ${action}] Fetch ครั้งที่ 2 ขัดข้อง (${err2.message})`);
+      }
+    }
+
+    // 3. สำหรับคำขอขนาดเล็ก (ที่ไม่ใช่ saveAttendanceDraft ที่มี records 53 คน) ให้ลอง JSONP สำรอง
+    if (!postRes && action !== 'saveAttendanceDraft') {
       try {
         const jsonpParams = { ...payload };
         if (typeof jsonpParams.records === 'object') {
@@ -327,19 +355,18 @@ const Api = {
         }
         postRes = await this.fetchJsonp(apiUrl, action, jsonpParams);
       } catch (jsonpErr) {
-        console.warn(`[Api POST ${action}] JSONP สำรองครั้งที่ 1 ขัดข้อง (${jsonpErr.message}) ลองอีกครั้ง...`);
-        try {
-          await new Promise(r => setTimeout(r, 1200));
-          const jsonpParams = { ...payload };
-          if (typeof jsonpParams.records === 'object') {
-            jsonpParams.records = JSON.stringify(jsonpParams.records);
-          }
-          postRes = await this.fetchJsonp(apiUrl, action, jsonpParams);
-        } catch (retryErr) {
-          console.warn(`[Api POST ${action}] ล้มเหลว (${retryErr.message}) สลับไปใช้ Local Mock`);
-          return this.mockPost(action, payload);
-        }
+        lastError = jsonpErr;
+        console.warn(`[Api POST ${action}] JSONP สำรองขัดข้อง (${jsonpErr.message})`);
       }
+    }
+
+    // 4. ตรวจสอบผลลัพธ์: ห้าม Fallback ไป Local Mock เด็ดขาดเมื่อใช้งานในโหมดเชื่อมต่อ Google Sheets จริง!
+    if (!postRes) {
+      console.error(`[Api POST ${action}] ล้มเหลวทุกช่องทาง:`, lastError);
+      return {
+        success: false,
+        error: `ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ Google Sheets ได้ (${lastError ? lastError.message : 'เครือข่ายขัดข้องหรือหมดเวลา'}) กรุณาตรวจสอบสัญญาณอินเทอร์เน็ตแล้วลองใหม่อีกครั้ง`
+      };
     }
 
     // อัปเดตแคชอย่างชาญฉลาดโดยไม่ทำลายข้อมูลเดิม (ห้าม clearCache() เด็ดขาด เพื่อป้องกันหน้าว่าง)

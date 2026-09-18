@@ -181,14 +181,19 @@ const Attendance = {
     this.render();
   },
 
-  setStatus(fullName, status, idx) {
+  async setStatus(fullName, status, idx) {
     if (!this.currentSession) {
-      alert('⚠️ ยังไม่ได้เลือกองค์ประชุม!\n\nกรุณาเลือกองค์ประชุมที่กล่องด้านบน หรือกดปุ่ม "+ สร้างองค์ประชุมใหม่" ก่อนเริ่มเช็คชื่อครับ');
+      Toast.warning('กรุณาเลือกองค์ประชุมที่กล่องด้านบน หรือกดปุ่ม "+ สร้างองค์ประชุมใหม่" ก่อนเริ่มเช็คชื่อครับ');
       return;
     }
 
     if (this.currentSession.status === 'submitted') {
-      const confirmEdit = confirm('องค์ประชุมนี้ส่งสรุปผลไปแล้ว ต้องการแก้ไขสถานะเพิ่มเติมใช่หรือไม่?');
+      const confirmEdit = await AppModal.confirm({
+        title: 'องค์ประชุมส่งสรุปผลแล้ว',
+        message: 'องค์ประชุมนี้ส่งสรุปผลไปแล้ว ต้องการแก้ไขสถานะเพิ่มเติมใช่หรือไม่?',
+        confirmText: 'แก้ไขเพิ่มเติม',
+        cancelText: 'ยกเลิก'
+      });
       if (!confirmEdit) return;
     }
 
@@ -232,7 +237,7 @@ const Attendance = {
   async saveDraft(showSuccessAlert = true) {
     if (!this.currentSessionId) {
       if (showSuccessAlert) {
-        alert('⚠️ กรุณาเลือกหรือสร้างองค์ประชุมก่อนทำการบันทึก');
+        Toast.warning('กรุณาเลือกหรือสร้างองค์ประชุมก่อนทำการบันทึก');
       }
       return;
     }
@@ -252,6 +257,11 @@ const Attendance = {
 
     if (recordsArray.length === 0) return;
 
+    let loadingToast = null;
+    if (showSuccessAlert) {
+      loadingToast = Toast.loading('กำลังบันทึกร่างข้อมูลลง Google Sheets...');
+    }
+
     this.isSaving = true;
     const res = await Api.requestPost('saveAttendanceDraft', {
       sessionId: this.currentSessionId,
@@ -260,6 +270,11 @@ const Attendance = {
     });
     this.isSaving = false;
 
+    // อัปเดตแคชหน้าแรกด้วย เพื่อให้เมื่อกดดูหน้าแรกจะเห็นข้อมูลสดใหม่ทันที 0ms
+    if (window.Dashboard && Dashboard.attendanceCache) {
+      Dashboard.attendanceCache[this.currentSessionId] = recordsArray;
+    }
+
     const statusText = document.getElementById('draft-status-indicator');
     if (res && res.success) {
       const timeStr = new Date().toLocaleTimeString('th-TH');
@@ -267,20 +282,36 @@ const Attendance = {
         statusText.innerHTML = `✓ บันทึกร่างเรียบร้อยแล้วเมื่อ ${timeStr}`;
         statusText.className = 'status-text saved';
       }
-      if (showSuccessAlert) {
-        alert('บันทึกร่างข้อมูลเรียบร้อยแล้ว!');
+      if (loadingToast) {
+        loadingToast.update({
+          type: 'success',
+          message: `✓ บันทึกร่างข้อมูลเรียบร้อยแล้วเมื่อ ${timeStr}`,
+          duration: 3500
+        });
       }
     } else {
+      const errMsg = res ? res.error : 'โปรดตรวจสอบการเชื่อมต่ออินเทอร์เน็ต';
       if (statusText) {
-        statusText.innerHTML = `⚠️ บันทึกล้มเหลว: ${res ? res.error : 'โปรดตรวจสอบการเชื่อมต่อ'}`;
+        statusText.innerHTML = `⚠️ บันทึกล้มเหลว: ${errMsg}`;
         statusText.className = 'status-text error';
+      }
+      if (loadingToast) {
+        loadingToast.update({
+          type: 'error',
+          message: `⚠️ บันทึกร่างไม่สำเร็จ: ${errMsg}`,
+          duration: 5000
+        });
       }
     }
   },
 
   async syncReportToSheets(e) {
     if (!this.currentSessionId) {
-      alert('⚠️ กรุณาเลือกองค์ประชุมด้านบนก่อน เพื่อสร้างหรืออัปเดตรายงานผลขององค์ประชุมนั้นลงใน Google Sheets ครับ');
+      AppModal.alert({
+        title: 'ยังไม่ได้เลือกองค์ประชุม',
+        message: '⚠️ กรุณาเลือกองค์ประชุมด้านบนก่อน เพื่อสร้างหรืออัปเดตรายงานผลขององค์ประชุมนั้นลงใน Google Sheets ครับ',
+        type: 'warning'
+      });
       return;
     }
     const btn = (e && e.target) ? e.target : null;
@@ -289,19 +320,26 @@ const Attendance = {
       btn.disabled = true;
       btn.textContent = '⏳ กำลังสร้างแท็บใน Google Sheets...';
     }
+    const toast = Toast.loading('กำลังสร้างและอัปเดตแท็บรายงานใน Google Sheets...');
     try {
       // บันทึกสถานะล่าสุดก่อน
       await this.saveDraft(false);
       const res = await Api.requestGet('generateReport', { sessionId: this.currentSessionId });
+      toast.dismiss();
       if (res && res.success) {
         const sessionTitle = this.currentSession ? this.currentSession.session_title : '';
         const cleanName = sessionTitle ? `วาระ_${sessionTitle.substring(0, 20)}` : 'แท็บประจำวาระ';
-        alert(`✅ สร้าง/อัปเดตแท็บใน Google Sheets เรียบร้อยแล้ว!\n\n📑 แท็บเฉพาะของวาระนี้: "${cleanName}" (แยกแท็บถาวร ไม่ทับกับวาระอื่น)\n📊 แท็บสรุปล่าสุด: "บันทึกผลการเช็คชื่อ"\n\nคุณสามารถเปิดดูใน Google Sheets ได้ทันทีครับ`);
+        await AppModal.alert({
+          title: 'สร้างรายงานใน Google Sheets สำเร็จ',
+          message: `✅ สร้าง/อัปเดตแท็บใน Google Sheets เรียบร้อยแล้ว!\n\n📑 แท็บเฉพาะของวาระนี้: "${cleanName}" (แยกแท็บถาวร ไม่ทับกับวาระอื่น)\n📊 แท็บสรุปล่าสุด: "บันทึกผลการเช็คชื่อ"\n\nคุณสามารถเปิดดูใน Google Sheets ได้ทันทีครับ`,
+          type: 'success'
+        });
       } else {
-        alert('⚠️ บันทึกข้อมูลเรียบร้อยแล้ว หากยังไม่เห็นแท็บใหม่ กรุณาเปิด Google Sheets แล้วกดรีเฟรช (F5) ครับ');
+        Toast.warning('⚠️ บันทึกข้อมูลเรียบร้อยแล้ว หากยังไม่เห็นแท็บใหม่ กรุณาเปิด Google Sheets แล้วกดรีเฟรช (F5) ครับ');
       }
     } catch (err) {
-      alert('⚠️ เกิดข้อผิดพลาด: ' + err.message);
+      toast.dismiss();
+      Toast.error('⚠️ เกิดข้อผิดพลาด: ' + err.message);
     } finally {
       if (btn) {
         btn.disabled = false;
@@ -312,7 +350,11 @@ const Attendance = {
 
   async submitSession() {
     if (!this.currentSessionId || !this.currentSession) {
-      alert('⚠️ ไม่พบองค์ประชุม กรุณาเลือกหรือสร้างองค์ประชุมก่อน');
+      AppModal.alert({
+        title: 'ยังไม่ได้เลือกองค์ประชุม',
+        message: '⚠️ ไม่พบองค์ประชุม กรุณาเลือกหรือสร้างองค์ประชุมก่อนทำการส่งสรุปผล',
+        type: 'warning'
+      });
       return;
     }
 
@@ -321,12 +363,21 @@ const Attendance = {
     const uncheckedCount = totalTarget - checkedCount;
 
     let confirmMsg = `ยืนยันการ "ส่งสรุปผล" องค์ประชุมนี้หรือไม่?\n\n` +
-      `องค์ประชุม: ${this.currentSession.session_title}\n` +
-      `เช็คแล้ว: ${checkedCount} คน\n` +
+      `📌 องค์ประชุม: ${this.currentSession.session_title}\n` +
+      `✓ เช็คแล้ว: ${checkedCount} คน\n` +
       (uncheckedCount > 0 ? `⚠️ ยังไม่ได้เช็ค: ${uncheckedCount} คน (จะถือว่าขาด/ยังไม่ระบุ)\n` : `✓ เช็คครบทุกคนแล้ว\n`) +
       `\nเมื่อส่งแล้ว ระบบจะคำนวณสถิติและอัปเดตลง Google Sheets ทันที`;
 
-    if (!confirm(confirmMsg)) return;
+    const confirmed = await AppModal.confirm({
+      title: 'ยืนยันการส่งสรุปผลองค์ประชุม',
+      message: confirmMsg,
+      confirmText: '🚀 ยืนยันส่งสรุปผล',
+      cancelText: 'ยกเลิก',
+      type: 'primary'
+    });
+    if (!confirmed) return;
+
+    const toast = Toast.loading('กำลังส่งสรุปผลและสร้างแท็บรายงานใน Google Sheets...');
 
     // บันทึก draft ล่าสุดก่อน
     await this.saveDraft(false);
@@ -339,15 +390,25 @@ const Attendance = {
       adminId: adminId
     });
 
+    toast.dismiss();
+
     if (res && res.success) {
-      alert('🎉 ส่งสรุปผลและปิดรอบการเช็คชื่อสำเร็จแล้ว! สถิติถูกอัปเดตเรียบร้อย');
+      await AppModal.alert({
+        title: 'ส่งสรุปผลสำเร็จ 🎉',
+        message: '🎉 ส่งสรุปผลและปิดรอบการเช็คชื่อสำเร็จแล้ว!\nสถิติและแท็บบันทึกผลถูกอัปเดตลง Google Sheets เรียบร้อย',
+        type: 'success'
+      });
       this.currentSession.status = 'submitted';
       await this.loadSessionsList();
       if (window.Dashboard && typeof Dashboard.loadPublicStats === 'function') {
         Dashboard.loadPublicStats(true);
       }
     } else {
-      alert('เกิดข้อผิดพลาด: ' + (res ? res.error : 'ไม่สามารถส่งได้'));
+      await AppModal.alert({
+        title: 'ส่งสรุปผลไม่สำเร็จ',
+        message: 'เกิดข้อผิดพลาด: ' + (res ? res.error : 'ไม่สามารถส่งได้ กรุณาตรวจสอบสัญญาณอินเทอร์เน็ต'),
+        type: 'error'
+      });
     }
   },
 
@@ -382,17 +443,17 @@ const Attendance = {
         Dashboard.loadPublicStats(true);
       }
 
-      alert(`✅ สร้างองค์ประชุม "${newSession.session_title}" สำเร็จแล้ว! พร้อมเริ่มเช็คชื่อได้ทันที`);
+      Toast.success(`✅ สร้างองค์ประชุม "${newSession.session_title}" สำเร็จแล้ว! พร้อมเริ่มเช็คชื่อได้ทันที`);
       return true;
     } else {
-      alert('ไม่สามารถสร้างองค์ประชุมได้: ' + (res && res.error ? res.error : 'ข้อผิดพลาดไม่ทราบสาเหตุ'));
+      Toast.error('ไม่สามารถสร้างองค์ประชุมได้: ' + (res && res.error ? res.error : 'ข้อผิดพลาดไม่ทราบสาเหตุ'));
       return false;
     }
   },
 
   async deleteCurrentSession() {
     if (!this.currentSessionId || !this.currentSession) {
-      alert('⚠️ ยังไม่ได้เลือกองค์ประชุมที่จะลบ');
+      Toast.warning('⚠️ ยังไม่ได้เลือกองค์ประชุมที่จะลบ');
       return;
     }
 
@@ -405,7 +466,14 @@ const Attendance = {
       `• ข้อมูลการเช็คชื่อทั้งหมดของวาระนี้จะถูกลบ\n\n` +
       `ยืนยันการลบหรือไม่? (การกระทำนี้ไม่สามารถย้อนกลับได้)`;
 
-    if (!confirm(confirmMsg)) return;
+    const confirmed = await AppModal.confirm({
+      title: 'ยืนยันการลบองค์ประชุม',
+      message: confirmMsg,
+      confirmText: 'ลบวาระ',
+      cancelText: 'ยกเลิก',
+      type: 'danger'
+    });
+    if (!confirmed) return;
 
     const user = Auth.getUser();
     const adminId = user ? user.adminId : 'admin01';
@@ -436,19 +504,20 @@ const Attendance = {
 
     // ✅ ลบสำเร็จจาก API → ลบออกจาก UI และแคชทันที
     if (apiOk) {
-      alert(`✅ ลบวาระ "${title}" สำเร็จเรียบร้อยแล้ว!`);
+      Toast.success(`✅ ลบวาระ "${title}" สำเร็จเรียบร้อยแล้ว!`);
       this._removeSessionFromUI(deletedId);
     } else {
       // ❌ API ล้มเหลวหรือวาระถูกลบไปแล้ว → ถามยืนยันเพื่อลบออกจากหน้าเว็บและแคชเครื่อง
-      const forceRemove = confirm(
-        `⚠️ ไม่สามารถลบผ่าน Google Sheets ได้ (${apiError})\n\n` +
-        `(อาจเป็นเพราะวาระนี้ถูกลบจากชีตไปแล้ว หรือเครือข่ายขัดข้อง)\n\n` +
-        `🔹 ต้องการลบวาระ "${title}" ออกจากหน้าเว็บและแคชเครื่องทันทีหรือไม่?\n` +
-        `(กด "ตกลง" เพื่อล้างออกถาวร)`
-      );
+      const forceRemove = await AppModal.confirm({
+        title: 'ลบวาระออกจากหน้าเว็บและแคช',
+        message: `⚠️ ไม่สามารถลบผ่าน Google Sheets ได้ (${apiError})\n\n(อาจเป็นเพราะวาระนี้ถูกลบจากชีตไปแล้ว หรือเครือข่ายขัดข้อง)\n\nต้องการลบวาระ "${title}" ออกจากหน้าเว็บและแคชเครื่องทันทีหรือไม่?`,
+        confirmText: 'ล้างออกจากหน้าเว็บ',
+        cancelText: 'ยกเลิก',
+        type: 'warning'
+      });
       if (forceRemove) {
         this._removeSessionFromUI(deletedId);
-        alert(`✅ ลบวาระ "${title}" ออกจากหน้าเว็บและแคชเรียบร้อยแล้ว`);
+        Toast.success(`ลบวาระ "${title}" ออกจากหน้าเว็บและแคชเรียบร้อยแล้ว`);
       }
     }
 
@@ -497,14 +566,19 @@ const Attendance = {
     }
   },
 
-  markRemainingAs(status = 'มา') {
+  async markRemainingAs(status = 'มา') {
     if (!this.currentSession) {
-      alert('⚠️ ยังไม่ได้เลือกองค์ประชุม!\n\nกรุณาเลือกองค์ประชุมที่กล่องด้านบน หรือกดปุ่ม "+ สร้างองค์ประชุมใหม่" ก่อนเริ่มเช็คชื่อครับ');
+      Toast.warning('⚠️ ยังไม่ได้เลือกองค์ประชุม!\n\nกรุณาเลือกองค์ประชุมที่กล่องด้านบน หรือกดปุ่ม "+ สร้างองค์ประชุมใหม่" ก่อนเริ่มเช็คชื่อครับ');
       return;
     }
 
     if (this.currentSession.status === 'submitted') {
-      const confirmEdit = confirm('องค์ประชุมนี้ส่งสรุปผลไปแล้ว ต้องการแก้ไขสถานะเพิ่มเติมใช่หรือไม่?');
+      const confirmEdit = await AppModal.confirm({
+        title: 'องค์ประชุมส่งสรุปผลแล้ว',
+        message: 'องค์ประชุมนี้ส่งสรุปผลไปแล้ว ต้องการแก้ไขสถานะเพิ่มเติมใช่หรือไม่?',
+        confirmText: 'แก้ไขเพิ่มเติม',
+        cancelText: 'ยกเลิก'
+      });
       if (!confirmEdit) return;
     }
 
@@ -516,7 +590,7 @@ const Attendance = {
     });
 
     if (remaining.length === 0) {
-      alert('💡 สมาชิกทุกคนที่แสดงอยู่ได้รับการเช็คชื่อครบเรียบร้อยแล้ว ไม่มีคนที่เหลือครับ');
+      Toast.info('💡 สมาชิกทุกคนที่แสดงอยู่ได้รับการเช็คชื่อครบเรียบร้อยแล้ว ไม่มีคนที่เหลือครับ');
       return;
     }
 
@@ -526,7 +600,13 @@ const Attendance = {
       detailMsg += `\n\n(สมาชิกอีก ${countAlready} คนที่เช็คสถานะไว้แล้ว เช่น สาย, ลา, ขาด จะคงเดิม ไม่ถูกเปลี่ยนแปลง)`;
     }
 
-    if (!confirm(detailMsg)) return;
+    const confirmed = await AppModal.confirm({
+      title: `ตั้งสถานะคนที่เหลือเป็น "${status}"`,
+      message: detailMsg,
+      confirmText: 'ยืนยัน',
+      cancelText: 'ยกเลิก'
+    });
+    if (!confirmed) return;
 
     remaining.forEach(st => {
       this.records[st.full_name] = status;
@@ -534,18 +614,25 @@ const Attendance = {
 
     this.render();
     this.triggerAutoSave();
+    Toast.success(`✓ กำหนดสถานะ ${remaining.length} คนเป็น "${status}" เรียบร้อย`);
   },
 
-  markAllAs(status) {
+  async markAllAs(status) {
     if (!this.currentSession) {
-      alert('⚠️ ยังไม่ได้เลือกองค์ประชุม!\n\nกรุณาเลือกองค์ประชุมที่กล่องด้านบน หรือกดปุ่ม "+ สร้างองค์ประชุมใหม่" ก่อนเริ่มเช็คชื่อครับ');
+      Toast.warning('⚠️ ยังไม่ได้เลือกองค์ประชุม!\n\nกรุณาเลือกองค์ประชุมที่กล่องด้านบน หรือกดปุ่ม "+ สร้างองค์ประชุมใหม่" ก่อนเริ่มเช็คชื่อครับ');
       return;
     }
 
     const students = this.getFilteredStudents();
     if (students.length === 0) return;
 
-    if (!confirm(`ต้องการตั้งสถานะทุกคนที่แสดงอยู่ (${students.length} คน) เป็น "${status}" ใช่หรือไม่?`)) return;
+    const confirmed = await AppModal.confirm({
+      title: `ตั้งสถานะทุกคนเป็น "${status}"`,
+      message: `ต้องการตั้งสถานะทุกคนที่แสดงอยู่ (${students.length} คน) เป็น "${status}" ใช่หรือไม่?`,
+      confirmText: 'ยืนยัน',
+      cancelText: 'ยกเลิก'
+    });
+    if (!confirmed) return;
 
     students.forEach(st => {
       this.records[st.full_name] = status;
@@ -553,17 +640,23 @@ const Attendance = {
 
     this.render();
     this.triggerAutoSave();
+    Toast.success(`✓ ตั้งสถานะ ${students.length} คนเป็น "${status}" เรียบร้อย`);
   },
 
   async resetAllAttendance() {
     if (!this.currentSession) {
-      alert('⚠️ ยังไม่ได้เลือกองค์ประชุม!\n\nกรุณาเลือกองค์ประชุมที่กล่องด้านบน หรือกดปุ่ม "+ สร้างองค์ประชุมใหม่" ก่อนครับ');
+      Toast.warning('⚠️ ยังไม่ได้เลือกองค์ประชุม!\n\nกรุณาเลือกองค์ประชุมที่กล่องด้านบน หรือกดปุ่ม "+ สร้างองค์ประชุมใหม่" ก่อนครับ');
       return;
     }
 
-    if (!confirm('⚠️ ยืนยันการล้างผลเช็คชื่อทั้งหมดขององค์ประชุมนี้หรือไม่?\n\n(สถานะของทุกคนจะกลับเป็น "ยังไม่เช็ค" ทั้งบนหน้าเว็บและใน Google Sheets ทันที)')) {
-      return;
-    }
+    const confirmed = await AppModal.confirm({
+      title: 'ยืนยันการล้างผลเช็คชื่อ',
+      message: '⚠️ ข้อมูลการเช็คชื่อทั้งหมดของวาระนี้จะถูกรีเซ็ตกลับเป็น "ยังไม่เช็ค" ทั้งบนหน้าเว็บและใน Google Sheets ทันที\n\nต้องการดำเนินการต่อหรือไม่?',
+      confirmText: 'ยืนยันล้างผล',
+      cancelText: 'ยกเลิก',
+      type: 'danger'
+    });
+    if (!confirmed) return;
 
     this.records = {};
     this.render();
@@ -581,7 +674,7 @@ const Attendance = {
       statusText.innerHTML = `✓ รีเซ็ตผลเช็คชื่อเป็น "ยังไม่เช็ค" ครบทุกคนแล้วเมื่อ ${timeStr}`;
       statusText.className = 'status-text saved';
     }
-    alert('✅ ล้างผลการเช็คชื่อเรียบร้อยแล้ว ทุกคนกลับเป็น "ยังไม่เช็ค" ทั้งบนหน้าเว็บและใน Google Sheets');
+    Toast.success('✅ ล้างผลการเช็คชื่อเรียบร้อยแล้ว ทุกคนกลับเป็น "ยังไม่เช็ค" ทั้งบนหน้าเว็บและใน Google Sheets');
   },
 
   clearCurrentFilters() {

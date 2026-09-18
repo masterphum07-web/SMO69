@@ -164,8 +164,8 @@
             <select id="public-session-select" class="select-custom" style="font-size: 0.82rem; padding: 0.4rem 0.75rem; min-width: 220px;" onchange="Dashboard.onPublicSessionChange(this.value)">
               <option value="">กำลังโหลดรายการวาระ...</option>
             </select>
-            <button class="btn-outline btn-sm" onclick="Dashboard.loadPublicStats(false, true)" title="ดึงข้อมูลล่าสุดจาก Google Sheets ทันที">
-              🔄 รีเฟรช
+            <button id="btn-public-refresh" class="btn-outline btn-sm" onclick="Dashboard.manualRefresh()" title="ดึงข้อมูลล่าสุดจาก Google Sheets ทันที">
+              <span id="public-refresh-icon">🔄</span> รีเฟรช
             </button>
           </div>
         </div>
@@ -569,6 +569,7 @@
 
   <!-- ================= SCRIPTS ================= -->
   <script src="js/config.js"></script>
+  <script src="js/ui-feedback.js"></script>
   <script src="js/mock-data.js"></script>
   <script src="js/api.js"></script>
   <script src="js/auth.js"></script>

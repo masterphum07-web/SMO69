@@ -15,7 +15,7 @@ const BUILTIN_API_URL = 'https://script.google.com/macros/s/AKfycbzSUwpiZQqSBzYm
 const DEFAULT_CONFIG = {
   apiUrl: localStorage.getItem(CONFIG_KEYS.API_URL) || BUILTIN_API_URL,
   useMock: localStorage.getItem(CONFIG_KEYS.USE_MOCK) === 'true',
-  pollInterval: parseInt(localStorage.getItem(CONFIG_KEYS.POLL_INTERVAL), 10) || 8000
+  pollInterval: 25000
 };
 
 const Config = {
@@ -44,11 +44,15 @@ const Config = {
   },
 
   getPollInterval() {
-    return DEFAULT_CONFIG.pollInterval;
+    const custom = parseInt(localStorage.getItem(CONFIG_KEYS.POLL_INTERVAL), 10);
+    if (custom && custom >= 15000) {
+      return custom;
+    }
+    return 25000;
   },
 
   setPollInterval(seconds) {
-    const ms = Math.max(5000, Math.min(30000, seconds * 1000));
+    const ms = Math.max(15000, Math.min(60000, seconds * 1000));
     localStorage.setItem(CONFIG_KEYS.POLL_INTERVAL, ms);
   }
 };

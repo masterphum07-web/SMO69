@@ -410,8 +410,16 @@ const MockDB = {
 
   submitAttendance(sessionId, adminId) {
     const db = this.get();
-    const sess = db.sessions.find(s => s.session_id === sessionId);
-    if (!sess) return { success: false, error: 'ไม่พบองค์ประชุม' };
+    let sess = db.sessions.find(s => s.session_id === sessionId);
+    if (!sess) {
+      const cached = (window.Api && typeof Api.getCachedInitialData === 'function') ? Api.getCachedInitialData() : null;
+      const cachedSess = (cached && Array.isArray(cached.sessions)) ? cached.sessions.find(s => s.session_id === sessionId) : null;
+      if (cachedSess) {
+        sess = { ...cachedSess };
+        db.sessions.push(sess);
+      }
+    }
+    if (!sess) return { success: false, error: 'ไม่พบองค์ประชุม ID: ' + sessionId };
     sess.status = 'submitted';
     this.save(db);
     return { success: true, message: 'ยืนยันและปิดรอบการเช็คชื่อเรียบร้อยแล้ว' };

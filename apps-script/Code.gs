@@ -437,6 +437,14 @@ function doPost(e) {
         result = submitAttendance(payload.sessionId, payload.adminId);
         break;
 
+      case 'generateReport':
+        result = generateSessionReport(payload.sessionId);
+        break;
+
+      case 'generateAllReports':
+        result = generateAllSessionsReports();
+        break;
+
       case 'deleteSession':
         result = deleteSession(payload.sessionId, payload.adminId, payload.title);
         break;
