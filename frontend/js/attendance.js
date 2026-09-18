@@ -59,11 +59,6 @@ const Attendance = {
       this.sessions = sessions;
     }
 
-    // ถ้ามี currentSession แต่ยังไม่ปรากฏใน sessions ให้เพิ่มเข้าไปด้วย (ป้องกันข้อมูลตกหล่น)
-    if (this.currentSession && !this.sessions.some(s => s.session_id === this.currentSession.session_id)) {
-      this.sessions.unshift(this.currentSession);
-    }
-
     if (!this.sessions || this.sessions.length === 0) {
       select.innerHTML = '<option value="">-- ยังไม่มีองค์ประชุม (กรุณากด "+ สร้างองค์ประชุมใหม่") --</option>';
       this.currentSessionId = null;
@@ -320,8 +315,8 @@ const Attendance = {
       alert('🎉 ส่งสรุปผลและปิดรอบการเช็คชื่อสำเร็จแล้ว! สถิติถูกอัปเดตเรียบร้อย');
       this.currentSession.status = 'submitted';
       await this.loadSessionsList();
-      if (window.Dashboard) {
-        window.Dashboard.load();
+      if (window.Dashboard && typeof Dashboard.loadPublicStats === 'function') {
+        Dashboard.loadPublicStats(true);
       }
     } else {
       alert('เกิดข้อผิดพลาด: ' + (res ? res.error : 'ไม่สามารถส่งได้'));
@@ -355,8 +350,8 @@ const Attendance = {
       this.populateSessions(this.sessions);
 
       // 4. โหลดสถิติ Dashboard ใหม่ใน background
-      if (window.Dashboard) {
-        Dashboard.load();
+      if (window.Dashboard && typeof Dashboard.loadPublicStats === 'function') {
+        Dashboard.loadPublicStats(true);
       }
 
       alert(`✅ สร้างองค์ประชุม "${newSession.session_title}" สำเร็จแล้ว! พร้อมเริ่มเช็คชื่อได้ทันที`);
@@ -410,21 +405,21 @@ const Attendance = {
       apiError = err.message || 'การเชื่อมต่อขัดข้อง';
     }
 
-    // ✅ ลบสำเร็จจาก API → ลบออกจาก UI ทันที
+    // ✅ ลบสำเร็จจาก API → ลบออกจาก UI และแคชทันที
     if (apiOk) {
       alert(`✅ ลบวาระ "${title}" สำเร็จเรียบร้อยแล้ว!`);
       this._removeSessionFromUI(deletedId);
     } else {
-      // ❌ API ล้มเหลว → ถามว่าจะลบออกจากหน้าเว็บอย่างเดียวไหม
+      // ❌ API ล้มเหลวหรือวาระถูกลบไปแล้ว → ถามยืนยันเพื่อลบออกจากหน้าเว็บและแคชเครื่อง
       const forceRemove = confirm(
-        `⚠️ ลบจาก Google Sheet ไม่สำเร็จ:\n${apiError}\n\n` +
+        `⚠️ ไม่สามารถลบผ่าน Google Sheets ได้ (${apiError})\n\n` +
         `(อาจเป็นเพราะวาระนี้ถูกลบจากชีตไปแล้ว หรือเครือข่ายขัดข้อง)\n\n` +
-        `🔹 ต้องการลบวาระ "${title}" ออกจากหน้าเว็บอย่างเดียวหรือไม่?\n` +
-        `(กด "ตกลง" เพื่อลบออกจากหน้าเว็บ)`
+        `🔹 ต้องการลบวาระ "${title}" ออกจากหน้าเว็บและแคชเครื่องทันทีหรือไม่?\n` +
+        `(กด "ตกลง" เพื่อล้างออกถาวร)`
       );
       if (forceRemove) {
         this._removeSessionFromUI(deletedId);
-        alert(`✅ ลบวาระ "${title}" ออกจากหน้าเว็บเรียบร้อยแล้ว`);
+        alert(`✅ ลบวาระ "${title}" ออกจากหน้าเว็บและแคชเรียบร้อยแล้ว`);
       }
     }
 
@@ -434,7 +429,7 @@ const Attendance = {
     }
   },
 
-  /** ฟังก์ชันภายใน: ลบ session ออกจาก UI/state ทันที */
+  /** ฟังก์ชันภายใน: ลบ session ออกจาก UI/state/cache ทันที 100% */
   _removeSessionFromUI(sessionId) {
     this.currentSessionId = null;
     this.currentSession = null;
@@ -444,10 +439,31 @@ const Attendance = {
       this.sessions = this.sessions.filter(s => s.session_id !== sessionId);
     }
 
-    Api.clearCache();
+    // ล้างออกจากแคชทั้งในหน่วยความจำและ localStorage
+    Api.purgeSessionFromCache(sessionId);
+
+    // ล้างออกจาก MockDB เผื่อไว้
+    if (window.MockDB && typeof MockDB.deleteSession === 'function') {
+      try { MockDB.deleteSession(sessionId); } catch (e) {}
+    }
+
+    // เรนเดอร์ Dropdown และตารางในหน้า Attendance ใหม่
     this.populateSessions(this.sessions);
 
+    // อัปเดต Dropdown และตารางหน้าแรก (Dashboard) ทันที 100%
     if (window.Dashboard) {
+      if (Array.isArray(Dashboard.publicSessions)) {
+        Dashboard.publicSessions = Dashboard.publicSessions.filter(s => s.session_id !== sessionId);
+        if (Dashboard.selectedPublicSessionId === sessionId) {
+          Dashboard.selectedPublicSessionId = Dashboard.publicSessions.length > 0 ? Dashboard.publicSessions[0].session_id : null;
+        }
+        Dashboard.populatePublicSessionSelect();
+        if (Dashboard.selectedPublicSessionId) {
+          Dashboard.loadSelectedPublicSession(Dashboard.selectedPublicSessionId);
+        } else {
+          Dashboard.renderNoSessionsState();
+        }
+      }
       try { Dashboard.loadPublicStats(true); } catch (e) {}
     }
   },

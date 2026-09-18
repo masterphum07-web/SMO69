@@ -17,8 +17,8 @@ const Dashboard = {
   publicSearchQuery: '',
   _loadRetryCount: 0,
 
-  async init() {
-    await this.loadPublicStats();
+  async init(useCached = false) {
+    await this.loadPublicStats(useCached);
     this.startRealtimePolling();
   },
 
@@ -41,21 +41,21 @@ const Dashboard = {
     this.isPollingActive = false;
   },
 
-  async loadPublicStats(isBackground = false) {
+  async loadPublicStats(isBackground = false, forceRefresh = false) {
     const pollIndicator = document.getElementById('public-poll-indicator');
     if (pollIndicator && !isBackground) {
       pollIndicator.innerHTML = '<span class="pulse-dot"></span> กำลังดึงข้อมูลล่าสุด...';
     }
 
     try {
-      // ดึงข้อมูลทั้งหมดผ่าน getInitialData — ครั้งแรกบังคับ fresh, background ใช้ cache ได้
-      const forceRefresh = !isBackground || !Api.cache.initialData;
-      const initRes = await Api.getInitialData(forceRefresh);
+      // ดึงข้อมูลทั้งหมดผ่าน getInitialData
+      const shouldForce = forceRefresh || (!isBackground && !Api.cache.initialData);
+      const initRes = await Api.getInitialData(shouldForce);
       if (initRes && initRes.success && initRes.data) {
         const d = initRes.data;
         this.branches = d.branches || [];
         this.publicStudents = d.students || [];
-        this.publicSessions = d.sessions || [];
+        this.publicSessions = Array.isArray(d.sessions) ? d.sessions : [];
 
         // 1. เรนเดอร์ Leaderboard
         if (d.leaderboard) {
@@ -80,18 +80,18 @@ const Dashboard = {
 
         if (pollIndicator) {
           const now = new Date().toLocaleTimeString('th-TH');
-          pollIndicator.innerHTML = `<span class="pulse-dot active"></span> อัปเดตเรียลไทม์ล่าสุดเมื่อ ${now}`;
+          const staleTag = initRes.isStale ? ' (ข้อมูลแคช)' : '';
+          pollIndicator.innerHTML = `<span class="pulse-dot active"></span> อัปเดตเรียลไทม์ล่าสุดเมื่อ ${now}${staleTag}`;
         }
       } else if (!isBackground && this._loadRetryCount < 1) {
-        // Initial load ล้มเหลว → รอ 2 วิ แล้วลองอีกครั้ง (สูงสุด 1 ครั้ง)
+        // Initial load ล้มเหลว → รอ 1.5 วิ แล้วลองอีกครั้ง (สูงสุด 1 ครั้ง)
         this._loadRetryCount++;
         console.warn('โหลด Public Stats ไม่สำเร็จ ลองอีกครั้ง...');
         if (pollIndicator) {
           pollIndicator.innerHTML = '<span class="pulse-dot"></span> กำลังลองเชื่อมต่ออีกครั้ง...';
         }
-        await new Promise(r => setTimeout(r, 2000));
-        Api.clearCache();
-        return this.loadPublicStats(false);
+        await new Promise(r => setTimeout(r, 1500));
+        return this.loadPublicStats(false, true);
       }
     } catch (err) {
       console.warn('โหลด Public Stats ไม่สำเร็จ:', err);
@@ -174,9 +174,20 @@ const Dashboard = {
 
   renderNoSessionsState() {
     const titleEl = document.getElementById('public-session-title');
-    if (titleEl) titleEl.textContent = 'ยังไม่มีองค์ประชุมการเช็คชื่อในระบบ';
+    if (titleEl) titleEl.textContent = 'ยังไม่มีองค์ประชุมในระบบ';
+    const dateEl = document.getElementById('public-session-date');
+    if (dateEl) dateEl.textContent = '';
+    const badgeEl = document.getElementById('public-session-badge');
+    if (badgeEl) {
+      badgeEl.className = 'status-badge status-pending';
+      badgeEl.textContent = 'ไม่มีวาระ';
+    }
+    const heading = document.getElementById('public-table-heading');
+    if (heading) heading.textContent = 'ยังไม่มีองค์ประชุม';
     const tbody = document.getElementById('public-attendance-tbody');
-    if (tbody) tbody.innerHTML = '<tr><td colspan="3" class="empty-state" style="padding: 2.5rem 1rem; text-align: center; color: var(--text-muted);">ยังไม่มีข้อมูลองค์ประชุมในระบบ</td></tr>';
+    if (tbody) tbody.innerHTML = '<tr><td colspan="3" class="empty-state" style="padding: 2.5rem 1rem; text-align: center; color: var(--text-muted);">💡 ยังไม่มีข้อมูลองค์ประชุมในระบบ (สามารถสร้างองค์ประชุมใหม่ได้ในแท็บเช็คชื่อ)</td></tr>';
+    this.publicAttendanceMap = {};
+    this.updatePublicStatCards();
   },
 
   updatePublicStatCards() {

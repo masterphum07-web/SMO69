@@ -559,15 +559,15 @@ function getSessionsData() {
   const sessions = [];
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
-    if (row[0]) {
+    if (row[0] && String(row[0]).trim() !== '' && row[1] && String(row[1]).trim() !== '') {
       sessions.push({
         session_id: String(row[0]).trim(),
         session_title: String(row[1]).trim(),
         session_date: row[2] instanceof Date ? Utilities.formatDate(row[2], 'Asia/Bangkok', 'yyyy-MM-dd') : String(row[2]),
-        branch_scope: String(row[3]).trim(),
-        status: String(row[4]).trim(),
-        created_by: String(row[5]).trim(),
-        created_at: String(row[6])
+        branch_scope: String(row[3] || 'ALL').trim(),
+        status: String(row[4] || 'draft').trim(),
+        created_by: String(row[5] || 'admin').trim(),
+        created_at: String(row[6] || '')
       });
     }
   }
@@ -756,78 +756,88 @@ function deleteSession(sessionId, adminId) {
   }
 
   const lock = LockService.getScriptLock();
-  lock.waitLock(15000);
+  try {
+    lock.waitLock(10000);
+  } catch (e) {
+    Logger.log('Lock wait notice: ' + e.toString());
+  }
 
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
 
-    // 1. หาข้อมูล Session เพื่อดึงชื่อวาระมาลบแท็บ
+    // 1. หาข้อมูล Session และลบแถวในชีต Sessions แบบ in-memory (เร็วและเสถียร ไม่ติด timeout)
     const sessSheet = setSheet(SHEETS.SESSIONS);
     const sessData = sessSheet.getDataRange().getValues();
     let sessionTitle = '';
-    let foundRow = -1;
+    const newSessRows = [];
 
-    for (let i = 1; i < sessData.length; i++) {
-      if (String(sessData[i][0]).trim() === String(sessionId).trim()) {
-        foundRow = i + 1;
-        sessionTitle = String(sessData[i][1]).trim();
-        break;
+    if (sessData.length > 0) {
+      newSessRows.push(sessData[0]); // header
+      for (let i = 1; i < sessData.length; i++) {
+        const row = sessData[i];
+        if (String(row[0]).trim() === String(sessionId).trim()) {
+          sessionTitle = String(row[1] || '').trim();
+        } else if (row[0] && String(row[0]).trim() !== '') {
+          newSessRows.push(row);
+        }
+      }
+      sessSheet.clearContents();
+      if (newSessRows.length > 0) {
+        sessSheet.getRange(1, 1, newSessRows.length, newSessRows[0].length).setValues(newSessRows);
       }
     }
 
-    // 2. ลบแถวในชีต Sessions (ถ้ามี — อาจถูกลบด้วยมือไปแล้วก็ไม่เป็นไร)
-    if (foundRow !== -1) {
-      sessSheet.deleteRow(foundRow);
-    }
-
-    // 3. ลบประวัติการเช็คชื่อในชีต Attendance ที่ตรงกับ sessionId นี้ (ลบจากล่างขึ้นบน)
+    // 2. ลบประวัติการเช็คชื่อในชีต Attendance แบบ in-memory ทันที (แก้ปัญหาค้าง/timeout 30 วิ)
     const attSheet = setSheet(SHEETS.ATTENDANCE);
     const attData = attSheet.getDataRange().getValues();
-    for (let i = attData.length - 1; i >= 1; i--) {
-      if (String(attData[i][0]).trim() === String(sessionId).trim()) {
-        attSheet.deleteRow(i + 1);
+    if (attData.length > 1) {
+      const newAttRows = [attData[0]]; // header
+      for (let i = 1; i < attData.length; i++) {
+        if (String(attData[i][0]).trim() !== String(sessionId).trim()) {
+          newAttRows.push(attData[i]);
+        }
+      }
+      attSheet.clearContents();
+      if (newAttRows.length > 0) {
+        attSheet.getRange(1, 1, newAttRows.length, newAttRows[0].length).setValues(newAttRows);
       }
     }
 
-    // 4. ลบแท็บเฉพาะของวาระนี้ (วาระ_...) ถ้ามีอยู่
-    const cleanTitle = (sessionTitle || sessionId)
-      .replace(/[\[\]\*\?:\/\\\'\"]/, '')
-      .trim()
-      .substring(0, 25);
-    const sessionSheetName = 'วาระ_' + (cleanTitle || sessionId);
-    const targetSheet = ss.getSheetByName(sessionSheetName);
-    if (targetSheet) {
-      try {
-        ss.deleteSheet(targetSheet);
-      } catch (delErr) {
-        Logger.log('Could not delete sheet ' + sessionSheetName + ': ' + delErr.toString());
-      }
-    }
-
-    // ลองลบด้วยชื่อที่ตัด regex ออกหมด (กรณีชื่อมีอักขระพิเศษ)
-    if (!targetSheet && sessionTitle) {
-      const altCleanTitle = sessionTitle.replace(/[^ก-๙a-zA-Z0-9\s_\-]/g, '').trim().substring(0, 25);
-      const altSheetName = 'วาระ_' + altCleanTitle;
-      const altSheet = ss.getSheetByName(altSheetName);
-      if (altSheet) {
-        try {
-          ss.deleteSheet(altSheet);
-        } catch (delErr2) {
-          Logger.log('Could not delete alt sheet ' + altSheetName + ': ' + delErr2.toString());
+    // 3. ลบแท็บเฉพาะของวาระนี้ (วาระ_...) ทุกแท็บที่เกี่ยวข้อง
+    const allSheets = ss.getSheets();
+    const cleanT = (sessionTitle || '').replace(/[^ก-๙a-zA-Z0-9]/g, '');
+    for (let s of allSheets) {
+      const sName = s.getName();
+      if (sName.startsWith('วาระ_')) {
+        const cleanSName = sName.replace(/[^ก-๙a-zA-Z0-9]/g, '');
+        if (sName.includes(sessionId) || (cleanT && cleanSName.includes(cleanT))) {
+          try {
+            ss.deleteSheet(s);
+          } catch (delErr) {
+            Logger.log('Could not delete sheet ' + sName + ': ' + delErr.toString());
+          }
         }
       }
     }
 
     SpreadsheetApp.flush();
 
-    // 5. คำนวณสรุป Dashboard ใหม่
-    updateDashboardSummary();
+    // 4. คำนวณสรุป Dashboard ใหม่
+    try {
+      updateDashboardSummary();
+    } catch (dashErr) {
+      Logger.log('Warning updating dashboard summary: ' + dashErr.toString());
+    }
 
-    // 6. อัปเดตแท็บสรุปล่าสุด
-    if (sessSheet.getLastRow() > 1) {
-      generateLatestSessionReport();
-    } else {
-      setupSessionReportTemplate();
+    // 5. อัปเดตแท็บสรุปล่าสุด
+    try {
+      if (newSessRows.length > 1) {
+        generateLatestSessionReport();
+      } else {
+        setupSessionReportTemplate();
+      }
+    } catch (repErr) {
+      Logger.log('Notice: report update notice ' + repErr.toString());
     }
 
     const displayTitle = sessionTitle || sessionId;
@@ -839,7 +849,9 @@ function deleteSession(sessionId, adminId) {
   } catch (err) {
     return { success: false, error: err.toString() };
   } finally {
-    lock.releaseLock();
+    try {
+      lock.releaseLock();
+    } catch (e) {}
   }
 }
 
@@ -878,7 +890,7 @@ function updateDashboardSummary() {
     const fullName = String(row[1]).trim();
     const status = String(row[2]).trim();
 
-    if (statsMap[fullName]) {
+    if (validSessionIds.has(sId) && statsMap[fullName]) {
       statsMap[fullName].total++;
       if (status === 'มา') statsMap[fullName].present++;
       else if (status === 'สาย') statsMap[fullName].late++;

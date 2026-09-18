@@ -10,15 +10,20 @@ const App = {
     this.updateAuthUI();
     this.updateConnectionStatusBadge();
 
-    // ดึงข้อมูลภาพรวมระบบครั้งแรกเพียงครั้งเดียวเพื่อความเร็วสูงสุด
-    await Api.getInitialData();
+    // 1. ดึงข้อมูลภาพรวมระบบ (จะดึงจาก localStorage ทันทีถ้ามีแคช ทำให้เปิดหน้าเว็บได้ใน 0 วิ ไม่ติดจอขาว)
+    await Api.getInitialData(false);
 
-    // เริ่มต้นโมดูลต่าง ๆ
-    await Dashboard.init();
+    // 2. เริ่มต้นโมดูลต่าง ๆ ด้วยข้อมูลแคช/เริ่มต้นทันที
+    await Dashboard.init(true);
     await Attendance.init();
 
-    // แสดงแท็บแรก
+    // 3. แสดงแท็บแรก
     this.switchTab('public');
+
+    // 4. สั่งรีเฟรชข้อมูลเบื้องหลังเพื่อให้ได้สถานะเรียลไทม์สดใหม่จาก Google Sheets
+    setTimeout(() => {
+      Dashboard.loadPublicStats(true);
+    }, 200);
   },
 
   bindEvents() {

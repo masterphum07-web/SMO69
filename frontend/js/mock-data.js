@@ -417,6 +417,14 @@ const MockDB = {
     return { success: true, message: 'ยืนยันและปิดรอบการเช็คชื่อเรียบร้อยแล้ว' };
   },
 
+  deleteSession(sessionId, adminId) {
+    const db = this.get();
+    db.sessions = (db.sessions || []).filter(s => s.session_id !== sessionId);
+    db.attendance = (db.attendance || []).filter(a => a.session_id !== sessionId);
+    this.save(db);
+    return { success: true, message: 'ลบวาระองค์ประชุมเรียบร้อยแล้ว' };
+  },
+
   getLeaderboard() {
     const dash = this.getDashboard();
     const students = dash.students;
